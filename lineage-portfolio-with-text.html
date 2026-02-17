@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cross-Layer Data Lineage — Portfolio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+/* ── Wrapper layout ── */
+:root {
+  --panel-bg: #14141e;
+  --card-bg-panel: #1a1a2a;
+  --border-panel: #2a2a40;
+  --text-panel: #d4d4e8;
+  --text-muted-panel: #8888aa;
+  --accent-panel: #e0a020;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
+
+.page-layout { display: flex; height: 100%; width: 100%; }
+
+.explorer-pane {
+  flex: 1; min-width: 0; height: 100%; position: relative;
+  border-right: 1px solid var(--border-panel);
+}
+
+.text-pane {
+  width: 340px; min-width: 280px; max-width: 400px;
+  height: 100%; background: var(--panel-bg);
+  display: flex; flex-direction: column;
+  overflow-y: auto; scrollbar-width: thin;
+  z-index: 300;
+}
+.text-pane::-webkit-scrollbar { width: 6px; }
+.text-pane::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+.text-content {
+  padding: 28px 24px; flex: 1;
+  display: flex; flex-direction: column; justify-content: flex-start;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: var(--text-panel);
+}
+.text-content h1 {
+  font-size: 22px; font-weight: 700; color: #fff;
+  margin-bottom: 6px; letter-spacing: -0.3px; line-height: 1.3;
+}
+.text-content h1 em { font-style: normal; color: var(--accent-panel); }
+.text-content .subtitle {
+  font-size: 12px; color: var(--text-muted-panel); text-transform: uppercase;
+  letter-spacing: 1.5px; font-weight: 500; margin-bottom: 20px;
+}
+.tp-section { margin-bottom: 20px; }
+.tp-section-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--accent-panel); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.tp-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-panel); }
+.tp-section p {
+  font-size: 14px; line-height: 1.7; color: var(--text-panel); font-weight: 300;
+}
+.tp-tag-group { margin-bottom: 16px; }
+.tp-tag-group-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-muted-panel); margin-bottom: 6px;
+}
+.tp-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tp-tag {
+  font-size: 10px; font-weight: 500; padding: 3px 8px;
+  border-radius: 4px; border: 1px solid var(--border-panel);
+  background: var(--card-bg-panel); color: var(--text-muted-panel);
+  white-space: nowrap;
+}
+.tp-tag.ai {
+  border-color: rgba(224,160,32,0.3);
+  background: rgba(224,160,32,0.08);
+  color: #d0a840;
+}
+.tp-divider { height: 1px; background: var(--border-panel); margin: 4px 0 16px; }
+.tp-footnote {
+  font-size: 10px; color: #555570; font-style: italic;
+  line-height: 1.5; margin-top: auto; padding-top: 16px;
+  border-top: 1px solid var(--border-panel);
+}
+
+@media (max-width: 900px) {
+  .page-layout { flex-direction: column; }
+  .explorer-pane { border-right: none; border-bottom: 1px solid var(--border-panel); flex: 1; min-height: 50vh; }
+  .text-pane { width: 100%; max-width: none; height: auto; min-height: 300px; }
+}
+@media (max-width: 500px) {
+  .text-content h1 { font-size: 18px; }
+  .text-content { padding: 20px 16px; }
+  .tp-section p { font-size: 13px; }
+}
+
+/* ── Explorer styles ── */
+
+/* ═══════════════════════════════════════════════════════
+   COLOR PALETTE  (dark theme)
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --white: #1e1e2e;
+  --card-bg: #252536;
+  --card-border: #3a3a52;
+  --text: #d4d4e8;
+  --text-muted: #8888aa;
+  --black: #0e0e16;
+  --bg: #14141e;
+
+  /* Layer colors */
+  --postgresql: #336791;
+  --postgresql-light: #1a2430;
+  --postgresql-dark: #7ba8cc;
+
+  --snowflake: #29b5e8;
+  --snowflake-light: #142a36;
+  --snowflake-dark: #70d0f0;
+
+  --databricks: #e09030;
+  --databricks-light: #3a2a18;
+  --databricks-dark: #f0c080;
+
+  --powerquery: #20c9a6;
+  --powerquery-light: #1a3330;
+  --powerquery-dark: #80e8d0;
+
+  --semantic: #4a8ae0;
+  --semantic-light: #1a2640;
+  --semantic-dark: #90b8f0;
+
+  --report: #a070d0;
+  --report-light: #2a1a3a;
+  --report-dark: #c8a0e8;
+
+  /* Medallion */
+  --bronze: #d09040;
+  --bronze-light: #2e2218;
+  --silver: #909aa0;
+  --silver-light: #252830;
+  --gold: #e0b830;
+  --gold-light: #2e2818;
+
+  /* Highlighting */
+  --highlight: #f0c808;
+  --highlight-light: #3a3518;
+  --highlight-edge: #e0a820;
+  --dim-opacity: 0.08;
+
+  /* Toolbar */
+  --toolbar-bg: #0e0e18;
+  --toolbar-text: #c8d0e0;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════
+   TOOLBAR
+   ═══════════════════════════════════════════════════════ */
+#toolbar {
+  position: fixed; top: 0; left: 0; right: 0; min-height: 46px; z-index: 200;
+  background: var(--toolbar-bg); display: flex; align-items: center;
+  flex-wrap: wrap;
+  padding: 6px 16px; gap: 6px 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  border-bottom: 1px solid #2a2a40;
+}
+#toolbar h1 { font-size: 15px; font-weight: 700; color: var(--toolbar-text); white-space: nowrap; }
+#toolbar h1 em { font-style: normal; color: var(--highlight); }
+#searchBox {
+  padding: 5px 10px; border: 1px solid #3a3a55; border-radius: 5px;
+  font-size: 13px; width: 260px; max-width: 40vw; background: #1a1a2a; color: #d0d0e0; outline: none;
+}
+#searchBox:focus { border-color: var(--highlight); }
+#searchBox::placeholder { color: #606080; }
+.tb { padding: 4px 12px; border: 1px solid #3a3a55; border-radius: 5px; background: #1a1a2a; color: #9090b0; cursor: pointer; font-size: 12px; font-family: inherit; white-space: nowrap; }
+.tb:hover { background: #2a2a40; color: #e0e0f0; }
+.tb.active { background: #e0a020; color: #1a1a2e; border-color: #e0a020; font-weight: 600; }
+#info { font-size: 11px; color: #606080; margin-left: auto; white-space: nowrap; }
+
+@media (max-width: 700px) {
+  #toolbar { padding: 4px 8px; gap: 4px 6px; }
+  #toolbar h1 { font-size: 13px; }
+  #toolbar h1 span { display: none; }
+  #searchBox { width: 140px; max-width: 35vw; font-size: 12px; }
+  .tb { padding: 3px 8px; font-size: 11px; }
+  #info { display: none; }
+}
+@media (max-width: 480px) {
+  #toolbar h1 { font-size: 12px; }
+  #searchBox { width: 100px; }
+  .tb { padding: 2px 6px; font-size: 10px; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   CANVAS
+   ═══════════════════════════════════════════════════════ */
+#canvas { position: absolute; top: 46px; left: 0; right: 0; bottom: 0; overflow: hidden; touch-action: none; }
+#viewport { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+#edge-layer { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+#node-layer { position: absolute; top: 0; left: 0; }
+
+/* ═══════════════════════════════════════════════════════
+   LANE BACKGROUNDS
+   ═══════════════════════════════════════════════════════ */
+.lane-bg { position: absolute; border-radius: 12px; }
+.lane-title {
+  position: absolute; top: 12px; left: 0; right: 0;
+  text-align: center; font-size: 15px; font-weight: 700;
+  pointer-events: none; letter-spacing: 0.3px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GROUP BOXES
+   ═══════════════════════════════════════════════════════ */
+.group-box { position: absolute; border: 1.5px solid; border-radius: 8px; overflow: hidden; }
+.group-label { color: #fff; padding: 4px 14px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════
+   NODE CARDS
+   ═══════════════════════════════════════════════════════ */
+.sc-node {
+  position: absolute; width: 220px; border-radius: 7px;
+  border: 1.5px solid var(--card-border); background: var(--card-bg);
+  box-shadow: 2px 2px 14px rgba(0,0,0,0.5);
+  transition: box-shadow 0.15s, opacity 0.2s;
+  cursor: default; user-select: none;
+  overflow: hidden; z-index: 5;
+}
+.sc-node.expanded { z-index: 10; }
+.sc-node.dimmed { opacity: var(--dim-opacity); pointer-events: none; }
+.sc-node.search-hit { box-shadow: 0 0 0 3px var(--highlight), 2px 2px 14px rgba(0,0,0,0.5); }
+.sc-node.lineage-hit { box-shadow: 0 0 0 3px var(--highlight-edge), 2px 2px 14px rgba(0,0,0,0.5); }
+
+.sc-header {
+  display: flex; align-items: flex-start; border-radius: 5px 5px 0 0;
+  margin: -1px; cursor: pointer; overflow: hidden; position: relative;
+}
+.sc-icon {
+  font-family: 'Material Icons Outlined', sans-serif;
+  font-size: 32px; font-weight: normal; font-style: normal;
+  color: rgba(0,0,0,0.6); padding: 10px 0 8px 10px;
+  line-height: 1; display: inline-block; min-width: 48px;
+}
+.sc-header-info {
+  flex: 1; min-width: 0; overflow: hidden;
+  padding: 8px 8px 8px 6px; border-radius: 4px 4px 0 0;
+  margin: 6px 2px 6px 0; min-height: 42px;
+}
+.sc-headline {
+  font-size: 13px; font-weight: 700; line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sc-subtitle {
+  font-size: 10px; margin-top: 3px; opacity: 0.7;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sc-badge {
+  position: absolute; top: 8px; right: 6px;
+  font-size: 11px; color: #e0e0f0; font-weight: 700;
+  cursor: pointer; background: rgba(0,0,0,0.5);
+  padding: 3px 8px; border-radius: 4px;
+  line-height: 1.2; z-index: 2;
+  user-select: none; transition: background 0.15s, transform 0.1s;
+}
+.sc-badge:hover { background: rgba(0,0,0,0.75); transform: scale(1.08); }
+
+.sc-items { padding: 4px 0 4px 0; overflow-y: auto; scrollbar-width: thin; }
+.sc-items::-webkit-scrollbar { width: 6px; }
+.sc-items::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+.sc-items::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+.sc-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 10px; cursor: pointer; font-size: 13px; line-height: 1.3;
+  color: var(--text); transition: background 0.1s;
+}
+.sc-item:hover { background: rgba(240,200,8,0.25) !important; color: #fff; }
+.sc-item.hl { background: rgba(240,200,8,0.4); font-weight: 600; color: #fff; }
+.sc-item.connected { background: rgba(70,140,220,0.25); border-left: 3px solid #4a8cdc; padding-left: 7px; }
+.sc-item.connected-upstream { background: rgba(50,180,120,0.2); border-left: 3px solid #36b37e; padding-left: 7px; }
+.sc-item.connected-downstream { background: rgba(220,90,60,0.2); border-left: 3px solid #dc6844; padding-left: 7px; }
+.sc-item.unused { opacity: 0.4; text-decoration: line-through; }
+.sc-item.unused:hover { opacity: 1; text-decoration: none; }
+.sc-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 6px; }
+.sc-item-type {
+  font-size: 10px; font-weight: 600; padding: 1px 5px;
+  border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+}
+.sc-item-type.col { background: rgba(255,255,255,0.08); color: #9090b0; }
+.sc-item-type.measure { background: rgba(160,112,208,0.2); color: #c090e0; }
+.sc-toggle {
+  text-align: center; padding: 4px 0; font-size: 11px; color: #7070a0;
+  cursor: pointer; font-weight: 600;
+}
+.sc-toggle:hover { background: rgba(255,255,255,0.06); color: #c0c0e0; }
+
+/* ═══════════════════════════════════════════════════════
+   EDGES
+   ═══════════════════════════════════════════════════════ */
+.edge-card { fill: none; stroke: #3a4a60; stroke-width: 2.5; opacity: 0.5; }
+.edge-card.hl { stroke: var(--highlight-edge); stroke-width: 4; opacity: 0.9; }
+.edge-card.dimmed { opacity: 0.06; }
+.edge-item { fill: none; stroke: #3a4a60; stroke-width: 2; opacity: 0.4; }
+.edge-item.hl { stroke: var(--highlight-edge); stroke-width: 4; opacity: 0.95; }
+.edge-item.dimmed { opacity: 0.06; }
+
+/* ═══════════════════════════════════════════════════════
+   LEGEND  (smart: auto-hides on small viewports / tight zoom)
+   ═══════════════════════════════════════════════════════ */
+#legend {
+  position: fixed; bottom: 12px; right: 12px; z-index: 150;
+  background: rgba(26,26,42,0.92); border: 1px solid #2a2a40; border-radius: 8px;
+  padding: 8px 12px; box-shadow: 0 2px 16px rgba(0,0,0,0.5);
+  font-size: 11px; min-width: 140px; max-width: 200px;
+  color: #a0a0c0; backdrop-filter: blur(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+#legend.hidden { opacity: 0; pointer-events: none; transform: translateY(10px); }
+#legend b { display: block; margin-bottom: 4px; color: #c0c0e0; font-size: 11px; }
+.lg { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-size: 11px; }
+.lg-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
+
+/* ═══════════════════════════════════════════════════════
+   WIREFRAME PANEL  (report page detail)
+   ═══════════════════════════════════════════════════════ */
+#wireframe-panel {
+  position: fixed; top: 52px; right: 0; bottom: 0; width: 340px; z-index: 180;
+  background: rgba(20,20,30,0.96); border-left: 1px solid #2a2a40;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+  display: none; flex-direction: column; overflow: hidden;
+  transition: transform 0.25s ease;
+}
+#wireframe-panel.open { display: flex; }
+#wireframe-panel .wf-header {
+  padding: 12px 16px; border-bottom: 1px solid #2a2a40;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#wireframe-panel .wf-title { font-size: 14px; font-weight: 700; color: var(--report-dark); }
+#wireframe-panel .wf-close {
+  width: 28px; height: 28px; border: none; background: rgba(255,255,255,0.06);
+  border-radius: 6px; color: #a0a0c0; cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+#wireframe-panel .wf-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+#wireframe-panel .wf-canvas {
+  flex: 1; position: relative; margin: 12px; background: #0e0e18;
+  border-radius: 8px; border: 1px solid #2a2a40; overflow: hidden;
+}
+.wf-visual {
+  position: absolute; border: 1.5px solid #3a3a52; border-radius: 5px;
+  background: rgba(40,40,60,0.7); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 4px;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  cursor: default;
+}
+.wf-visual.impacted {
+  border-color: var(--highlight-edge);
+  background: rgba(224,168,32,0.15);
+  box-shadow: 0 0 10px rgba(224,168,32,0.3);
+}
+.wf-visual .wf-icon {
+  font-family: 'Material Icons Outlined'; font-size: 18px;
+  color: #606080; line-height: 1; margin-bottom: 2px;
+}
+.wf-visual.impacted .wf-icon { color: var(--highlight-edge); }
+.wf-visual .wf-label {
+  font-size: 9px; color: #8080a0; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
+.wf-visual.impacted .wf-label { color: #e0c060; font-weight: 600; }
+.wf-page-subtitle {
+  font-size: 11px; color: #606080; padding: 0 16px 4px;
+}
+
+@media (max-width: 800px) {
+  #wireframe-panel { width: 280px; }
+}
+@media (max-width: 500px) {
+  #wireframe-panel { width: 100%; }
+}
+
+
+/* Override: scope explorer to its pane */
+.explorer-pane #toolbar { position: absolute; }
+.explorer-pane #canvas { position: absolute; }
+</style>
+</head>
+<body>
+
+<div class="page-layout">
+  <div class="explorer-pane">
+<div id="toolbar">
+  <h1>Lineage <em>Explorer</em> <span style="font-size:11px;color:#606080;font-weight:400">— Cross-Layer Data Lineage</span></h1>
+  <input id="searchBox" type="text" placeholder="Filter by table or column name...">
+  <button class="tb" id="btnClear">Clear</button>
+  <button class="tb" id="btnExpandAll">Expand all</button>
+  <button class="tb" id="btnCollapseAll">Collapse all</button>
+  <span style="border-left:1px solid #3a3a50;height:20px;margin:0 4px"></span>
+  <button class="tb active" id="btnHlUnused" title="Strikethrough columns/measures not used on any report page">Unused: on</button>
+  <span style="border-left:1px solid #3a3a50;height:20px;margin:0 4px"></span>
+  <button class="tb" id="btnFit">Fit view</button>
+  <span id="info">Loading...</span>
+</div>
+
+<div id="canvas">
+  <div id="viewport">
+    <svg id="edge-layer" width="12000" height="8000"></svg>
+    <div id="node-layer"></div>
+  </div>
+</div>
+
+<div id="legend">
+  <b>Sources</b>
+  <div class="lg"><div class="lg-dot" style="background:var(--postgresql)"></div>PostgreSQL</div>
+  <div class="lg"><div class="lg-dot" style="background:var(--snowflake)"></div>Snowflake</div>
+  <div style="border-top:1px solid #2a2a40;margin:4px 0 3px"></div>
+  <b>Databricks</b>
+  <div class="lg" style="padding-left:4px"><div class="lg-dot" style="background:var(--bronze);width:10px;height:10px"></div>Bronze</div>
+  <div class="lg" style="padding-left:4px"><div class="lg-dot" style="background:var(--silver);width:10px;height:10px"></div>Silver</div>
+  <div class="lg" style="padding-left:4px"><div class="lg-dot" style="background:var(--gold);width:10px;height:10px"></div>Gold</div>
+  <div style="border-top:1px solid #2a2a40;margin:4px 0 3px"></div>
+  <b>Power BI</b>
+  <div class="lg"><div class="lg-dot" style="background:var(--powerquery)"></div>Power Query</div>
+  <div class="lg"><div class="lg-dot" style="background:var(--semantic)"></div>Semantic Model</div>
+  <div class="lg"><div class="lg-dot" style="background:var(--report)"></div>Report Pages</div>
+  <div style="border-top:1px solid #2a2a40;margin:4px 0 3px"></div>
+  <div class="lg"><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#3a4a60" stroke-width="2"/></svg>Connection</div>
+  <div class="lg"><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="var(--highlight-edge)" stroke-width="2.5"/></svg>Highlighted</div>
+  <div style="border-top:1px solid #2a2a40;margin:4px 0 3px"></div>
+  <div class="lg"><div class="lg-dot" style="background:rgba(240,200,8,0.5);width:10px;height:10px"></div><span>Selected</span></div>
+  <div class="lg"><div class="lg-dot" style="background:rgba(50,180,120,0.4);border-color:#36b37e;width:10px;height:10px"></div><span>Upstream</span></div>
+  <div class="lg"><div class="lg-dot" style="background:rgba(220,90,60,0.4);border-color:#dc6844;width:10px;height:10px"></div><span>Downstream</span></div>
+</div>
+
+<div id="wireframe-panel">
+  <div class="wf-header">
+    <span class="wf-title" id="wfTitle">Report Page</span>
+    <button class="wf-close" id="wfClose">×</button>
+  </div>
+  <div class="wf-page-subtitle" id="wfSubtitle">Click a report page to see visual layout</div>
+  <div class="wf-canvas" id="wfCanvas"></div>
+</div>
+  </div>
+
+<div class="text-pane">
+  <div class="text-content">
+    <h1>Cross-Layer<br>Data <em>Lineage</em></h1>
+    <div class="subtitle">Interactive Architecture Explorer</div>
+
+    <div class="tp-tag-group">
+      <div class="tp-tag-group-label">AI Toolkit</div>
+      <div class="tp-tags">
+        <span class="tp-tag ai">GenAI Code Pairing with Codex 5.3</span>
+        <span class="tp-tag ai">Prompt Engineering with GPT 5.2 Thinking</span>
+        <span class="tp-tag ai">AI Agent Creation with Cursor IDE + Claude Opus 4.6</span>
+      </div>
+    </div>
+
+    <div class="tp-tag-group">
+      <div class="tp-tag-group-label">Tech Stack</div>
+      <div class="tp-tags">
+        <span class="tp-tag">D3.js</span>
+        <span class="tp-tag">PostgreSQL</span>
+        <span class="tp-tag">Snowflake</span>
+        <span class="tp-tag">Databricks</span>
+        <span class="tp-tag">Power BI</span>
+        <span class="tp-tag">Column-Level Lineage</span>
+        <span class="tp-tag">BFS Graph Traversal</span>
+      </div>
+    </div>
+
+    <div class="tp-divider"></div>
+
+    <div class="tp-section">
+      <div class="tp-section-label">Business Problem</div>
+      <p>No unified view of the end-to-end BI architecture landscape, from source ingestion through medallion transformations to semantic model and report consumption - creating blind spots in governance, change management, and model optimization.</p>
+    </div>
+
+    <div class="tp-section">
+      <div class="tp-section-label">Solution</div>
+      <p>Architected the end-to-end solution design and leveraged GenAI-augmented development to rapidly prototype, iterate, and build a custom lineage visualization tool from scratch - mapping the entire BI architecture - PostgreSQL, Snowflake, Databricks, and reporting layer - into a single interactive explorer. Built as a repeatable process replicable across any BI environment, enabling instant impact analysis, unused field detection, and report wireframe visualization.</p>
+    </div>
+
+    <div class="tp-section">
+      <div class="tp-section-label">Scalable Framework</div>
+      <p>Built a dedicated AI agent repository with a framework for codified processes, procedures, and guardrails - designed to serve as a reusable foundation for custom data engineering projects. Includes structured prompt templates and version-controlled workflows, enabling rapid, governed development across any platform or architecture.</p>
+    </div>
+
+    <div class="tp-footnote">
+      Demo uses simulated data. Modeled after a production POC deployed at a major entertainment studio.
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+window.LINEAGE_DATA = {"cards":[{"id":"5206470e44d4","name":"erp_prod.public.sales_orders","layer":"postgresql","type":"postgresql_table","x":0,"y":0,"items":[{"id":"1259116eaa16","name":"order_id","type":"column","dataType":"string"},{"id":"2904cd4085dd","name":"customer_id","type":"column","dataType":"string"},{"id":"9b56866bd987","name":"product_id","type":"column","dataType":"string"},{"id":"2d899aee9306","name":"order_date","type":"column","dataType":"string"},{"id":"e98bb0f1336d","name":"quantity","type":"column","dataType":"string"},{"id":"4b5b2ec3a146","name":"unit_price","type":"column","dataType":"string"},{"id":"b4f688836427","name":"discount","type":"column","dataType":"string"},{"id":"352b3248589f","name":"status","type":"column","dataType":"string"},{"id":"68137e3c9eaf","name":"channel","type":"column","dataType":"string"},{"id":"093a099b8fc5","name":"region","type":"column","dataType":"string"},{"id":"fb787818acfe","name":"currency","type":"column","dataType":"string"},{"id":"31ca4002e203","name":"created_at","type":"column","dataType":"string"}]},{"id":"8714969f6452","name":"erp_prod.public.customers","layer":"postgresql","type":"postgresql_table","x":0,"y":0,"items":[{"id":"542f1bd0afd2","name":"customer_id","type":"column","dataType":"string"},{"id":"3af435d2a756","name":"first_name","type":"column","dataType":"string"},{"id":"b13e6bcc8a1d","name":"last_name","type":"column","dataType":"string"},{"id":"fb2f1328a8d5","name":"email","type":"column","dataType":"string"},{"id":"9b9d6f1ad2b6","name":"phone","type":"column","dataType":"string"},{"id":"4b79810a8f9c","name":"signup_date","type":"column","dataType":"string"},{"id":"87a9ccb441b4","name":"tier","type":"column","dataType":"string"},{"id":"0b125df50dcc","name":"country","type":"column","dataType":"string"},{"id":"abf8d2969545","name":"city","type":"column","dataType":"string"},{"id":"3de3acdf32e4","name":"postal_code","type":"column","dataType":"string"},{"id":"e9b3b5686363","name":"is_active","type":"column","dataType":"string"},{"id":"fbd60ad5eeac","name":"source","type":"column","dataType":"string"}]},{"id":"7a9a258859be","name":"erp_prod.public.product_master","layer":"postgresql","type":"postgresql_table","x":0,"y":0,"items":[{"id":"1e9d1500d3fb","name":"product_id","type":"column","dataType":"string"},{"id":"8b06a6559676","name":"product_name","type":"column","dataType":"string"},{"id":"a09971ab08f6","name":"category","type":"column","dataType":"string"},{"id":"e07d2fb8e7f4","name":"subcategory","type":"column","dataType":"string"},{"id":"6c4f20072d59","name":"brand","type":"column","dataType":"string"},{"id":"2a343df92015","name":"sku","type":"column","dataType":"string"},{"id":"8b7db830d2a2","name":"unit_cost","type":"column","dataType":"string"},{"id":"a821ac37f163","name":"list_price","type":"column","dataType":"string"},{"id":"b7274c4676aa","name":"weight_kg","type":"column","dataType":"string"},{"id":"f34259f4cdb6","name":"is_active","type":"column","dataType":"string"},{"id":"442a1478d0d4","name":"launch_date","type":"column","dataType":"string"}]},{"id":"b4d14dd94e4b","name":"logistics_dw.raw.shipment_events","layer":"snowflake","type":"snowflake_table","x":0,"y":0,"items":[{"id":"035ae07db2df","name":"shipment_id","type":"column","dataType":"string"},{"id":"5dec4d569e6b","name":"order_id","type":"column","dataType":"string"},{"id":"d6c6c5937e9f","name":"carrier","type":"column","dataType":"string"},{"id":"c6dbb8d4d857","name":"tracking_number","type":"column","dataType":"string"},{"id":"02a77599e64d","name":"ship_date","type":"column","dataType":"string"},{"id":"90421ba86083","name":"delivery_date","type":"column","dataType":"string"},{"id":"665c32542346","name":"status","type":"column","dataType":"string"},{"id":"dc46c18950f4","name":"warehouse_id","type":"column","dataType":"string"},{"id":"e8618ae41d46","name":"weight_kg","type":"column","dataType":"string"},{"id":"93c4ff503a6c","name":"cost","type":"column","dataType":"string"}]},{"id":"804a2f94a8a5","name":"logistics_dw.raw.return_requests","layer":"snowflake","type":"snowflake_table","x":0,"y":0,"items":[{"id":"6f4c5af02cce","name":"return_id","type":"column","dataType":"string"},{"id":"582f622559d7","name":"order_id","type":"column","dataType":"string"},{"id":"e87fc67b03f9","name":"product_id","type":"column","dataType":"string"},{"id":"f2178b5f306f","name":"return_date","type":"column","dataType":"string"},{"id":"7941da52a463","name":"reason","type":"column","dataType":"string"},{"id":"b24a311a24e7","name":"status","type":"column","dataType":"string"},{"id":"bef636445210","name":"refund_amount","type":"column","dataType":"string"},{"id":"454e0e0e2f49","name":"restocked","type":"column","dataType":"string"}]},{"id":"36a9b22deb09","name":"logistics_dw.raw.warehouse_inventory","layer":"snowflake","type":"snowflake_table","x":0,"y":0,"items":[{"id":"229b6b059505","name":"product_id","type":"column","dataType":"string"},{"id":"22e7d2849ede","name":"warehouse_id","type":"column","dataType":"string"},{"id":"99a205511452","name":"quantity_on_hand","type":"column","dataType":"string"},{"id":"7b40539fb90b","name":"quantity_reserved","type":"column","dataType":"string"},{"id":"59a1504d1c9a","name":"reorder_point","type":"column","dataType":"string"},{"id":"710673a08f25","name":"last_count_date","type":"column","dataType":"string"},{"id":"b8fa28a4fba7","name":"snapshot_date","type":"column","dataType":"string"}]},{"id":"9083088079f1","name":"commerce.raw_bronze.raw_orders","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"a7a94c9a5980","name":"order_id","type":"column","dataType":"string"},{"id":"513d15d3d0b4","name":"customer_id","type":"column","dataType":"string"},{"id":"7dc7b6db289e","name":"product_id","type":"column","dataType":"string"},{"id":"3297f194ef13","name":"order_date","type":"column","dataType":"string"},{"id":"980ca84f90e9","name":"quantity","type":"column","dataType":"string"},{"id":"59ad41a81afa","name":"unit_price","type":"column","dataType":"string"},{"id":"4fe8311e48cc","name":"discount","type":"column","dataType":"string"},{"id":"0a555adb1b5e","name":"status","type":"column","dataType":"string"},{"id":"07d0321953ac","name":"channel","type":"column","dataType":"string"},{"id":"7c37181a757a","name":"region","type":"column","dataType":"string"},{"id":"d92b4e6bf977","name":"currency","type":"column","dataType":"string"},{"id":"0c9a1ca4de5a","name":"created_at","type":"column","dataType":"string"}]},{"id":"960229f3f6e0","name":"commerce.raw_bronze.raw_customers","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"02aa0b823044","name":"customer_id","type":"column","dataType":"string"},{"id":"56a7e0a68665","name":"first_name","type":"column","dataType":"string"},{"id":"541aaa89c6b4","name":"last_name","type":"column","dataType":"string"},{"id":"51d8ecf85d26","name":"email","type":"column","dataType":"string"},{"id":"bfc7ef3c8684","name":"phone","type":"column","dataType":"string"},{"id":"3c44885413f2","name":"signup_date","type":"column","dataType":"string"},{"id":"dc1fd0c87665","name":"tier","type":"column","dataType":"string"},{"id":"fd6c1d29e407","name":"country","type":"column","dataType":"string"},{"id":"e93cb96909bf","name":"city","type":"column","dataType":"string"},{"id":"05f3b59c6e09","name":"postal_code","type":"column","dataType":"string"},{"id":"997f7471b55a","name":"is_active","type":"column","dataType":"string"},{"id":"16696072b037","name":"source","type":"column","dataType":"string"}]},{"id":"22230cf607b2","name":"commerce.raw_bronze.raw_products","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"b23fe78769d6","name":"product_id","type":"column","dataType":"string"},{"id":"d4531ea0886e","name":"product_name","type":"column","dataType":"string"},{"id":"46596df7c17e","name":"category","type":"column","dataType":"string"},{"id":"5491634c295a","name":"subcategory","type":"column","dataType":"string"},{"id":"459f4d3c55ff","name":"brand","type":"column","dataType":"string"},{"id":"318a37ba954e","name":"sku","type":"column","dataType":"string"},{"id":"ee62b34d8482","name":"unit_cost","type":"column","dataType":"string"},{"id":"1b3fe08e644d","name":"list_price","type":"column","dataType":"string"},{"id":"dac37a9250ee","name":"weight_kg","type":"column","dataType":"string"},{"id":"60b687461983","name":"is_active","type":"column","dataType":"string"},{"id":"d5d4931cf1e3","name":"launch_date","type":"column","dataType":"string"}]},{"id":"4daffe9fc3ca","name":"commerce.raw_bronze.raw_shipments","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"7ab3b762db07","name":"shipment_id","type":"column","dataType":"string"},{"id":"3dba7d0e42c6","name":"order_id","type":"column","dataType":"string"},{"id":"d66ae9d5d199","name":"carrier","type":"column","dataType":"string"},{"id":"c9c9a1564517","name":"tracking_number","type":"column","dataType":"string"},{"id":"14c87ef7a865","name":"ship_date","type":"column","dataType":"string"},{"id":"9839dcb5086c","name":"delivery_date","type":"column","dataType":"string"},{"id":"5bdea266d7eb","name":"status","type":"column","dataType":"string"},{"id":"80b9e3bb6032","name":"warehouse_id","type":"column","dataType":"string"},{"id":"5630fe7c7f36","name":"weight_kg","type":"column","dataType":"string"},{"id":"6c79bd493d46","name":"cost","type":"column","dataType":"string"}]},{"id":"3cc3877780b7","name":"commerce.raw_bronze.raw_returns","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"6daf3bdf4463","name":"return_id","type":"column","dataType":"string"},{"id":"da721edc135b","name":"order_id","type":"column","dataType":"string"},{"id":"12c80f3c262c","name":"product_id","type":"column","dataType":"string"},{"id":"96311a5fe9c6","name":"return_date","type":"column","dataType":"string"},{"id":"a05e319e3a40","name":"reason","type":"column","dataType":"string"},{"id":"2805bb9fb934","name":"status","type":"column","dataType":"string"},{"id":"27b24fae5e98","name":"refund_amount","type":"column","dataType":"string"},{"id":"851c7e2203f6","name":"restocked","type":"column","dataType":"string"}]},{"id":"79bfd591b418","name":"commerce.raw_bronze.raw_inventory","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"d0a88ef430af","name":"product_id","type":"column","dataType":"string"},{"id":"3b1cb3d6bf5c","name":"warehouse_id","type":"column","dataType":"string"},{"id":"a2233bc9f55e","name":"quantity_on_hand","type":"column","dataType":"string"},{"id":"c7c4d2784a30","name":"quantity_reserved","type":"column","dataType":"string"},{"id":"0afcbc45a01a","name":"reorder_point","type":"column","dataType":"string"},{"id":"a520e6b64369","name":"last_count_date","type":"column","dataType":"string"},{"id":"525e12dec93f","name":"snapshot_date","type":"column","dataType":"string"}]},{"id":"40e8d4bb1e10","name":"commerce.clean_silver.persisted_order_details","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"78ce1aa61f16","name":"order_id","type":"column","dataType":"string"},{"id":"3fd1a057f080","name":"customer_id","type":"column","dataType":"string"},{"id":"0d8060d2814c","name":"product_id","type":"column","dataType":"string"},{"id":"eecd4368af36","name":"order_date","type":"column","dataType":"string"},{"id":"4586372be106","name":"quantity","type":"column","dataType":"string"},{"id":"a33c197d5469","name":"unit_price","type":"column","dataType":"string"},{"id":"80d3dfd5ffd1","name":"discount","type":"column","dataType":"string"},{"id":"52c1d3b8dfb4","name":"total_amount","type":"column","dataType":"string"},{"id":"be266b2a4632","name":"status","type":"column","dataType":"string"},{"id":"abdebdd19cc3","name":"channel","type":"column","dataType":"string"},{"id":"ab67b03b8025","name":"region","type":"column","dataType":"string"}]},{"id":"7132213dc4d6","name":"commerce.clean_silver.persisted_customer_profiles","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"c9a4d32a4b06","name":"customer_id","type":"column","dataType":"string"},{"id":"918165996001","name":"full_name","type":"column","dataType":"string"},{"id":"9e0938fffe5a","name":"email","type":"column","dataType":"string"},{"id":"171a6258b2d7","name":"signup_date","type":"column","dataType":"string"},{"id":"9555955f651e","name":"tier","type":"column","dataType":"string"},{"id":"86e233332ad1","name":"country","type":"column","dataType":"string"},{"id":"a66bf4bb46ff","name":"city","type":"column","dataType":"string"},{"id":"d144426aa95e","name":"lifetime_order_count","type":"column","dataType":"string"},{"id":"e8d9740ed82a","name":"is_active","type":"column","dataType":"string"}]},{"id":"be4e4d09d31a","name":"commerce.clean_silver.persisted_product_catalog","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"1a22971fa3cd","name":"product_id","type":"column","dataType":"string"},{"id":"5f6273f482fc","name":"product_name","type":"column","dataType":"string"},{"id":"8f82d14867ce","name":"category","type":"column","dataType":"string"},{"id":"abf134f39a89","name":"subcategory","type":"column","dataType":"string"},{"id":"75aa704a211b","name":"brand","type":"column","dataType":"string"},{"id":"7a932ba15147","name":"sku","type":"column","dataType":"string"},{"id":"12ad380de45b","name":"unit_cost","type":"column","dataType":"string"},{"id":"8e6e422f7ac0","name":"list_price","type":"column","dataType":"string"},{"id":"8a34172cd9b9","name":"margin_pct","type":"column","dataType":"string"},{"id":"004ff7c9eae2","name":"is_active","type":"column","dataType":"string"}]},{"id":"604cb5c75ee6","name":"commerce.clean_silver.persisted_shipment_tracking","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"3f4c96a82c85","name":"shipment_id","type":"column","dataType":"string"},{"id":"e5fe358b4f37","name":"order_id","type":"column","dataType":"string"},{"id":"26264aafe2c0","name":"carrier","type":"column","dataType":"string"},{"id":"25acaf756a15","name":"ship_date","type":"column","dataType":"string"},{"id":"8260214802fa","name":"delivery_date","type":"column","dataType":"string"},{"id":"ed2887e02c24","name":"transit_days","type":"column","dataType":"string"},{"id":"5a979e3cc770","name":"status","type":"column","dataType":"string"},{"id":"4f15674f44ef","name":"on_time_flag","type":"column","dataType":"string"}]},{"id":"70430ba47154","name":"commerce.clean_silver.persisted_returns_clean","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"0064ce3269ff","name":"return_id","type":"column","dataType":"string"},{"id":"d37ae7280962","name":"order_id","type":"column","dataType":"string"},{"id":"c3698ba7d598","name":"product_id","type":"column","dataType":"string"},{"id":"089cc6a0ef6d","name":"return_date","type":"column","dataType":"string"},{"id":"ca703d3a7950","name":"reason","type":"column","dataType":"string"},{"id":"45cd8de6dfb4","name":"status","type":"column","dataType":"string"},{"id":"48fabb6d05dc","name":"refund_amount","type":"column","dataType":"string"}]},{"id":"d2dbc4847108","name":"commerce.mart_gold.curated_order_metrics","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"b94c0378f398","name":"order_date","type":"column","dataType":"string"},{"id":"ed748653badb","name":"region","type":"column","dataType":"string"},{"id":"ed77ce6bbb86","name":"channel","type":"column","dataType":"string"},{"id":"920a9d877a33","name":"order_count","type":"column","dataType":"string"},{"id":"4892ccd9a5af","name":"total_revenue","type":"column","dataType":"string"},{"id":"f4c7aa4b0c7b","name":"avg_order_value","type":"column","dataType":"string"},{"id":"56e2e76b1206","name":"discount_total","type":"column","dataType":"string"},{"id":"37abbf522323","name":"return_rate","type":"column","dataType":"string"},{"id":"8df4f5d975ea","name":"net_revenue","type":"column","dataType":"string"}]},{"id":"ede1e19d6b81","name":"commerce.mart_gold.curated_customer_360","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"fef698aa3e3a","name":"customer_id","type":"column","dataType":"string"},{"id":"84039656ae28","name":"full_name","type":"column","dataType":"string"},{"id":"2b042f531643","name":"tier","type":"column","dataType":"string"},{"id":"a2e464c8f636","name":"country","type":"column","dataType":"string"},{"id":"8417503f2ec1","name":"first_order_date","type":"column","dataType":"string"},{"id":"a99894e6dcd6","name":"last_order_date","type":"column","dataType":"string"},{"id":"ca14dcbb43c3","name":"total_orders","type":"column","dataType":"string"},{"id":"42edc42febb3","name":"total_revenue","type":"column","dataType":"string"},{"id":"c72133fb6b63","name":"avg_order_value","type":"column","dataType":"string"},{"id":"a2b672eb8387","name":"days_since_last_order","type":"column","dataType":"string"},{"id":"ae0596561bf7","name":"churn_risk_score","type":"column","dataType":"string"}]},{"id":"5f25014dcb6f","name":"commerce.mart_gold.curated_product_performance","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"557d23318b0e","name":"product_id","type":"column","dataType":"string"},{"id":"98d75d1466e3","name":"product_name","type":"column","dataType":"string"},{"id":"d2ee878f3e4e","name":"category","type":"column","dataType":"string"},{"id":"8d118f9303a2","name":"brand","type":"column","dataType":"string"},{"id":"e223f8a2ae4f","name":"units_sold","type":"column","dataType":"string"},{"id":"c75419645cd7","name":"revenue","type":"column","dataType":"string"},{"id":"61f7136e61dd","name":"return_count","type":"column","dataType":"string"},{"id":"e1c32cc9a7a5","name":"return_rate","type":"column","dataType":"string"},{"id":"ee46b9c28030","name":"margin_pct","type":"column","dataType":"string"},{"id":"6ac26ae19705","name":"inventory_turnover","type":"column","dataType":"string"}]},{"id":"d2a490d48bef","name":"commerce.mart_gold.curated_fulfillment_kpis","layer":"databricks","type":"databricks_table","x":0,"y":0,"items":[{"id":"fcf56559964d","name":"ship_date","type":"column","dataType":"string"},{"id":"1cb5ea1b2972","name":"carrier","type":"column","dataType":"string"},{"id":"3efb00af238f","name":"orders_shipped","type":"column","dataType":"string"},{"id":"4a8595b04429","name":"avg_transit_days","type":"column","dataType":"string"},{"id":"137c94126360","name":"on_time_pct","type":"column","dataType":"string"},{"id":"80a7e7acfbd7","name":"late_delivery_count","type":"column","dataType":"string"},{"id":"7ec145ae1df0","name":"cost_per_shipment","type":"column","dataType":"string"}]},{"id":"477a390e009b","name":"Order Metrics","layer":"powerquery","type":"powerquery_query","x":0,"y":0,"items":[]},{"id":"a3d1d0eda344","name":"Customer 360 View","layer":"powerquery","type":"powerquery_query","x":0,"y":0,"items":[{"id":"cccb14ac5f8d","name":"churn_risk_score","type":"column"},{"id":"811fa16dd67a","name":"country","type":"column"},{"id":"95ecd524e005","name":"customer_id","type":"column"},{"id":"58042e6a376a","name":"first_order_date","type":"column"},{"id":"53622c58a65f","name":"full_name","type":"column"},{"id":"cb7297c60187","name":"last_order_date","type":"column"},{"id":"2dee142d7520","name":"tier","type":"column"},{"id":"2466c005a53a","name":"total_orders","type":"column"},{"id":"c2c247c75464","name":"total_revenue","type":"column"}]},{"id":"bb750271999e","name":"Product Performance","layer":"powerquery","type":"powerquery_query","x":0,"y":0,"items":[]},{"id":"15440a67eab1","name":"Fulfillment KPIs","layer":"powerquery","type":"powerquery_query","x":0,"y":0,"items":[{"id":"e5dc83c9342f","name":"avg_transit_days","type":"column"},{"id":"7f917fba182a","name":"carrier","type":"column"},{"id":"b8913990f761","name":"cost_per_shipment","type":"column"},{"id":"49bc3c49c35a","name":"on_time_pct","type":"column"},{"id":"5e89d862445f","name":"orders_shipped","type":"column"},{"id":"0fbaee9d5463","name":"ship_date","type":"column"}]},{"id":"3f23905e1bd1","name":"Date Dimension","layer":"powerquery","type":"powerquery_query","x":0,"y":0,"items":[{"id":"f4e6ebdbfeb1","name":"Date","type":"column"},{"id":"205b45114604","name":"DayOfWeek","type":"column"},{"id":"d716faa26538","name":"FiscalQuarter","type":"column"},{"id":"981d8d113a26","name":"FiscalYear","type":"column"},{"id":"f36bb9cb366b","name":"IsWeekend","type":"column"},{"id":"4d682d955c76","name":"Month","type":"column"},{"id":"a7d07f0909c2","name":"MonthName","type":"column"},{"id":"050aab0f3f07","name":"Quarter","type":"column"},{"id":"189521715d5c","name":"Week","type":"column"},{"id":"0ab731ee6a4d","name":"Year","type":"column"}]},{"id":"741b4043be2a","name":"Order Metrics","layer":"semantic","type":"semantic_table","x":0,"y":0,"items":[{"id":"6bcba2151ae8","name":"avg_order_value","type":"column"},{"id":"da1ea2e2c030","name":"channel","type":"column"},{"id":"1fbe73ba064b","name":"discount_total","type":"column"},{"id":"000c13a97d02","name":"net_revenue","type":"column"},{"id":"673f00e14ac8","name":"order_count","type":"column"},{"id":"492f6ff3c5bd","name":"order_date","type":"column"},{"id":"d74ee13f49e9","name":"region","type":"column"},{"id":"9593901e23a4","name":"total_revenue","type":"column"}]},{"id":"bc4a7d53e65b","name":"Customer 360","layer":"semantic","type":"semantic_table","x":0,"y":0,"items":[{"id":"14ab91a93ecd","name":"Customer 360.customer_id","type":"column"},{"id":"115874103d54","name":"Customer 360.full_name","type":"column"},{"id":"7bc4fb0fbb07","name":"Customer 360.tier","type":"column"},{"id":"1dbf6df29a57","name":"Customer 360.country","type":"column"},{"id":"70e6ca0b7f46","name":"Customer 360.first_order_date","type":"column"},{"id":"75421bf3a6d7","name":"Customer 360.last_order_date","type":"column"},{"id":"3c815a1a0171","name":"Customer 360.total_orders","type":"column"},{"id":"1e1358c0eafa","name":"Customer 360.total_revenue","type":"column"},{"id":"1da55dafd5e2","name":"Customer 360.churn_risk_score","type":"column"},{"id":"ed91968caff0","name":"Customer 360.Active Customers","type":"measure"},{"id":"efd2d426c201","name":"Customer 360.New Customers MTD","type":"measure"},{"id":"b81da2e28931","name":"Customer 360.Churn Rate","type":"measure"},{"id":"0ff940f6c7de","name":"Customer 360.Avg Lifetime Value","type":"measure"},{"id":"b757c6453134","name":"Customer 360.Customer Retention Rate","type":"measure"},{"id":"86b1c7d3973e","name":"Customer 360.High Risk Count","type":"measure"}]},{"id":"ddf7443aada6","name":"Product Performance","layer":"semantic","type":"semantic_table","x":0,"y":0,"items":[{"id":"c0857f4dd14b","name":"brand","type":"column"},{"id":"7081bff7fbbf","name":"category","type":"column"},{"id":"1a5c8dc52682","name":"margin_pct","type":"column"},{"id":"621d9fb696ff","name":"product_id","type":"column"},{"id":"a55e14dd68a4","name":"product_name","type":"column"},{"id":"77ce54b0f3a8","name":"return_count","type":"column"},{"id":"ff867649a7ab","name":"revenue","type":"column"},{"id":"e177760ed21c","name":"units_sold","type":"column"}]},{"id":"77d845698f06","name":"Fulfillment","layer":"semantic","type":"semantic_table","x":0,"y":0,"items":[{"id":"bd15f257fa2f","name":"Fulfillment.ship_date","type":"column"},{"id":"70a65ec7bbd2","name":"Fulfillment.carrier","type":"column"},{"id":"615493d23a3d","name":"Fulfillment.orders_shipped","type":"column"},{"id":"795b4fa80ec3","name":"Fulfillment.avg_transit_days","type":"column"},{"id":"1de6d7492163","name":"Fulfillment.on_time_pct","type":"column"},{"id":"24f7db6c86d1","name":"Fulfillment.cost_per_shipment","type":"column"},{"id":"574870c0df38","name":"Fulfillment.On-Time Delivery %","type":"measure"},{"id":"2fb3bacd0851","name":"Fulfillment.Avg Transit Days","type":"measure"},{"id":"c71e44b703bc","name":"Fulfillment.Shipping Cost Total","type":"measure"},{"id":"90b45b4494a2","name":"Fulfillment.Late Deliveries","type":"measure"},{"id":"6fa9b1c6a224","name":"Fulfillment.Orders Shipped MTD","type":"measure"}]},{"id":"e2ed25a754c5","name":"Date","layer":"semantic","type":"semantic_table","x":0,"y":0,"items":[{"id":"64052338fb1f","name":"Date.Date","type":"column"},{"id":"3d2bcfa7e7dc","name":"Date.Year","type":"column"},{"id":"00795470e77a","name":"Date.Quarter","type":"column"},{"id":"de139671b947","name":"Date.Month","type":"column"},{"id":"2b7ccf6de5fd","name":"Date.MonthName","type":"column"},{"id":"0f61220b836a","name":"Date.Week","type":"column"},{"id":"3b4d4a9e5dc8","name":"Date.DayOfWeek","type":"column"},{"id":"d550dafb58d7","name":"Date.IsWeekend","type":"column"},{"id":"7ff7a116e2d6","name":"Date.FiscalYear","type":"column"},{"id":"c99126a6a657","name":"Date.FiscalQuarter","type":"column"}]},{"id":"721dd788c29e","name":"KPI Targets","layer":"semantic","type":"semantic_table","x":0,"y":0,"items":[{"id":"dd5f4c944878","name":"KPI Targets.metric_name","type":"column"},{"id":"24dd21f71c1f","name":"KPI Targets.target_value","type":"column"},{"id":"5b3df9a4f6c1","name":"KPI Targets.period","type":"column"},{"id":"9f7a7333ec26","name":"KPI Targets.threshold_green","type":"column"},{"id":"d8f024e0fbfd","name":"KPI Targets.threshold_yellow","type":"column"},{"id":"3f6554998e66","name":"KPI Targets.Revenue Target","type":"measure"},{"id":"ae6621f2bc61","name":"KPI Targets.On-Time Target","type":"measure"},{"id":"a8f81a85a59e","name":"KPI Targets.Churn Target","type":"measure"},{"id":"60367cd91b8c","name":"KPI Targets.Margin Target","type":"measure"}]},{"id":"c2194ce0b939","name":"Executive Dashboard","layer":"report","type":"report_page","x":0,"y":0,"items":[{"id":"b511373dc965","name":"Date.Date","type":"column"},{"id":"f8c08a3eddb9","name":"Date.FiscalQuarter","type":"column"},{"id":"ece711393602","name":"Date.Month","type":"column"},{"id":"ba93b2a4916f","name":"Customer 360.Active Customers","type":"measure"},{"id":"596a04d6ea25","name":"Customer 360.Avg Lifetime Value","type":"measure"},{"id":"4c8c8f4c7c78","name":"Customer 360.Churn Rate","type":"measure"},{"id":"9bccb86ed02b","name":"KPI Targets.On-Time Target","type":"measure"},{"id":"da7dd0f379d6","name":"KPI Targets.Revenue Target","type":"measure"},{"id":"a86315977993","name":"Order Metrics.Average Order Value","type":"measure"},{"id":"ea17cd920a90","name":"Order Metrics.Net Revenue","type":"measure"},{"id":"91b53f243937","name":"Order Metrics.Order Count","type":"measure"},{"id":"c02e391d1199","name":"Order Metrics.Revenue YoY Growth","type":"measure"},{"id":"94ed0d671aa2","name":"Order Metrics.Total Revenue","type":"measure"}]},{"id":"54c43c884ed2","name":"Sales Performance","layer":"report","type":"report_page","x":0,"y":0,"items":[{"id":"1387012c2cb6","name":"Date.Date","type":"column"},{"id":"360cb8ae224e","name":"Date.Quarter","type":"column"},{"id":"806be0d97956","name":"Date.Year","type":"column"},{"id":"08620c4a481a","name":"Order Metrics.avg_order_value","type":"column"},{"id":"b8a6341a7251","name":"Order Metrics.channel","type":"column"},{"id":"d7a89058ea91","name":"Order Metrics.region","type":"column"},{"id":"8e0cbf9ccff7","name":"Product Performance.brand","type":"column"},{"id":"7a98e2d8e7c1","name":"Product Performance.category","type":"column"},{"id":"5f42d2f9db73","name":"Order Metrics.Discount %","type":"measure"},{"id":"bb8c72d8ebd2","name":"Order Metrics.Return Rate","type":"measure"},{"id":"e47fb8c6d388","name":"Order Metrics.Total Revenue","type":"measure"},{"id":"909060a1dda7","name":"Product Performance.Revenue per SKU","type":"measure"},{"id":"627ff0703539","name":"Product Performance.Top Seller Revenue","type":"measure"}]},{"id":"94771d1c0220","name":"Customer Insights","layer":"report","type":"report_page","x":0,"y":0,"items":[{"id":"5f3dedd1834e","name":"Customer 360.churn_risk_score","type":"column"},{"id":"d94ffc8e925f","name":"Customer 360.country","type":"column"},{"id":"c12cd05671cf","name":"Customer 360.tier","type":"column"},{"id":"8b6d8a02a7ce","name":"Customer 360.total_orders","type":"column"},{"id":"fc296ac8501e","name":"Date.Date","type":"column"},{"id":"3d88670c32af","name":"Date.MonthName","type":"column"},{"id":"80284ba00392","name":"Order Metrics.total_revenue","type":"column"},{"id":"97e000c73796","name":"Customer 360.Active Customers","type":"measure"},{"id":"c711d5ba4140","name":"Customer 360.Churn Rate","type":"measure"},{"id":"537901206c5e","name":"Customer 360.Customer Retention Rate","type":"measure"},{"id":"71570329a4d3","name":"Customer 360.High Risk Count","type":"measure"},{"id":"fb32996900ac","name":"Customer 360.New Customers MTD","type":"measure"},{"id":"53b379ead30a","name":"Order Metrics.Order Count","type":"measure"}]},{"id":"2d9543e1d732","name":"Fulfillment Tracker","layer":"report","type":"report_page","x":0,"y":0,"items":[{"id":"ac948c0194f8","name":"Date.Date","type":"column"},{"id":"1b8677208d28","name":"Date.Week","type":"column"},{"id":"5cc34286248e","name":"Fulfillment.avg_transit_days","type":"column"},{"id":"4c071587a9f7","name":"Fulfillment.carrier","type":"column"},{"id":"cb1e3e4345d3","name":"Fulfillment.orders_shipped","type":"column"},{"id":"7232543f0317","name":"Fulfillment.Avg Transit Days","type":"measure"},{"id":"2338b2baa3ff","name":"Fulfillment.Late Deliveries","type":"measure"},{"id":"b6f3210984d9","name":"Fulfillment.On-Time Delivery %","type":"measure"},{"id":"531a1276e331","name":"Fulfillment.Orders Shipped MTD","type":"measure"},{"id":"1b3bd0eb9afa","name":"Fulfillment.Shipping Cost Total","type":"measure"},{"id":"513a161464e5","name":"KPI Targets.On-Time Target","type":"measure"}]}],"cardEdges":[{"from":"9083088079f1","to":"5206470e44d4"},{"from":"960229f3f6e0","to":"8714969f6452"},{"from":"22230cf607b2","to":"7a9a258859be"},{"from":"4daffe9fc3ca","to":"b4d14dd94e4b"},{"from":"3cc3877780b7","to":"804a2f94a8a5"},{"from":"79bfd591b418","to":"36a9b22deb09"},{"from":"40e8d4bb1e10","to":"9083088079f1"},{"from":"7132213dc4d6","to":"960229f3f6e0"},{"from":"be4e4d09d31a","to":"22230cf607b2"},{"from":"604cb5c75ee6","to":"4daffe9fc3ca"},{"from":"70430ba47154","to":"3cc3877780b7"},{"from":"d2dbc4847108","to":"40e8d4bb1e10"},{"from":"d2dbc4847108","to":"70430ba47154"},{"from":"ede1e19d6b81","to":"7132213dc4d6"},{"from":"ede1e19d6b81","to":"40e8d4bb1e10"},{"from":"5f25014dcb6f","to":"be4e4d09d31a"},{"from":"5f25014dcb6f","to":"40e8d4bb1e10"},{"from":"5f25014dcb6f","to":"70430ba47154"},{"from":"d2a490d48bef","to":"604cb5c75ee6"},{"from":"d2a490d48bef","to":"40e8d4bb1e10"},{"from":"477a390e009b","to":"d2dbc4847108"},{"from":"a3d1d0eda344","to":"ede1e19d6b81"},{"from":"bb750271999e","to":"5f25014dcb6f"},{"from":"15440a67eab1","to":"d2a490d48bef"},{"from":"741b4043be2a","to":"741b4043be2a"},{"from":"bc4a7d53e65b","to":"a3d1d0eda344"},{"from":"ddf7443aada6","to":"ddf7443aada6"},{"from":"77d845698f06","to":"15440a67eab1"},{"from":"e2ed25a754c5","to":"3f23905e1bd1"},{"from":"c2194ce0b939","to":"741b4043be2a"},{"from":"c2194ce0b939","to":"bc4a7d53e65b"},{"from":"c2194ce0b939","to":"721dd788c29e"},{"from":"c2194ce0b939","to":"e2ed25a754c5"},{"from":"54c43c884ed2","to":"741b4043be2a"},{"from":"54c43c884ed2","to":"ddf7443aada6"},{"from":"54c43c884ed2","to":"e2ed25a754c5"},{"from":"94771d1c0220","to":"bc4a7d53e65b"},{"from":"94771d1c0220","to":"741b4043be2a"},{"from":"94771d1c0220","to":"e2ed25a754c5"},{"from":"2d9543e1d732","to":"77d845698f06"},{"from":"2d9543e1d732","to":"721dd788c29e"},{"from":"2d9543e1d732","to":"e2ed25a754c5"}],"itemEdges":[{"fromCard":"9083088079f1","fromItem":"a7a94c9a5980","toCard":"5206470e44d4","toItem":"1259116eaa16"},{"fromCard":"9083088079f1","fromItem":"513d15d3d0b4","toCard":"5206470e44d4","toItem":"2904cd4085dd"},{"fromCard":"9083088079f1","fromItem":"7dc7b6db289e","toCard":"5206470e44d4","toItem":"9b56866bd987"},{"fromCard":"9083088079f1","fromItem":"3297f194ef13","toCard":"5206470e44d4","toItem":"2d899aee9306"},{"fromCard":"9083088079f1","fromItem":"980ca84f90e9","toCard":"5206470e44d4","toItem":"e98bb0f1336d"},{"fromCard":"9083088079f1","fromItem":"59ad41a81afa","toCard":"5206470e44d4","toItem":"4b5b2ec3a146"},{"fromCard":"9083088079f1","fromItem":"4fe8311e48cc","toCard":"5206470e44d4","toItem":"b4f688836427"},{"fromCard":"9083088079f1","fromItem":"0a555adb1b5e","toCard":"5206470e44d4","toItem":"352b3248589f"},{"fromCard":"9083088079f1","fromItem":"07d0321953ac","toCard":"5206470e44d4","toItem":"68137e3c9eaf"},{"fromCard":"9083088079f1","fromItem":"7c37181a757a","toCard":"5206470e44d4","toItem":"093a099b8fc5"},{"fromCard":"9083088079f1","fromItem":"d92b4e6bf977","toCard":"5206470e44d4","toItem":"fb787818acfe"},{"fromCard":"9083088079f1","fromItem":"0c9a1ca4de5a","toCard":"5206470e44d4","toItem":"31ca4002e203"},{"fromCard":"960229f3f6e0","fromItem":"02aa0b823044","toCard":"8714969f6452","toItem":"542f1bd0afd2"},{"fromCard":"960229f3f6e0","fromItem":"56a7e0a68665","toCard":"8714969f6452","toItem":"3af435d2a756"},{"fromCard":"960229f3f6e0","fromItem":"541aaa89c6b4","toCard":"8714969f6452","toItem":"b13e6bcc8a1d"},{"fromCard":"960229f3f6e0","fromItem":"51d8ecf85d26","toCard":"8714969f6452","toItem":"fb2f1328a8d5"},{"fromCard":"960229f3f6e0","fromItem":"bfc7ef3c8684","toCard":"8714969f6452","toItem":"9b9d6f1ad2b6"},{"fromCard":"960229f3f6e0","fromItem":"3c44885413f2","toCard":"8714969f6452","toItem":"4b79810a8f9c"},{"fromCard":"960229f3f6e0","fromItem":"dc1fd0c87665","toCard":"8714969f6452","toItem":"87a9ccb441b4"},{"fromCard":"960229f3f6e0","fromItem":"fd6c1d29e407","toCard":"8714969f6452","toItem":"0b125df50dcc"},{"fromCard":"960229f3f6e0","fromItem":"e93cb96909bf","toCard":"8714969f6452","toItem":"abf8d2969545"},{"fromCard":"960229f3f6e0","fromItem":"05f3b59c6e09","toCard":"8714969f6452","toItem":"3de3acdf32e4"},{"fromCard":"960229f3f6e0","fromItem":"997f7471b55a","toCard":"8714969f6452","toItem":"e9b3b5686363"},{"fromCard":"960229f3f6e0","fromItem":"16696072b037","toCard":"8714969f6452","toItem":"fbd60ad5eeac"},{"fromCard":"22230cf607b2","fromItem":"b23fe78769d6","toCard":"7a9a258859be","toItem":"1e9d1500d3fb"},{"fromCard":"22230cf607b2","fromItem":"d4531ea0886e","toCard":"7a9a258859be","toItem":"8b06a6559676"},{"fromCard":"22230cf607b2","fromItem":"46596df7c17e","toCard":"7a9a258859be","toItem":"a09971ab08f6"},{"fromCard":"22230cf607b2","fromItem":"5491634c295a","toCard":"7a9a258859be","toItem":"e07d2fb8e7f4"},{"fromCard":"22230cf607b2","fromItem":"459f4d3c55ff","toCard":"7a9a258859be","toItem":"6c4f20072d59"},{"fromCard":"22230cf607b2","fromItem":"318a37ba954e","toCard":"7a9a258859be","toItem":"2a343df92015"},{"fromCard":"22230cf607b2","fromItem":"ee62b34d8482","toCard":"7a9a258859be","toItem":"8b7db830d2a2"},{"fromCard":"22230cf607b2","fromItem":"1b3fe08e644d","toCard":"7a9a258859be","toItem":"a821ac37f163"},{"fromCard":"22230cf607b2","fromItem":"dac37a9250ee","toCard":"7a9a258859be","toItem":"b7274c4676aa"},{"fromCard":"22230cf607b2","fromItem":"60b687461983","toCard":"7a9a258859be","toItem":"f34259f4cdb6"},{"fromCard":"22230cf607b2","fromItem":"d5d4931cf1e3","toCard":"7a9a258859be","toItem":"442a1478d0d4"},{"fromCard":"4daffe9fc3ca","fromItem":"7ab3b762db07","toCard":"b4d14dd94e4b","toItem":"035ae07db2df"},{"fromCard":"4daffe9fc3ca","fromItem":"3dba7d0e42c6","toCard":"b4d14dd94e4b","toItem":"5dec4d569e6b"},{"fromCard":"4daffe9fc3ca","fromItem":"d66ae9d5d199","toCard":"b4d14dd94e4b","toItem":"d6c6c5937e9f"},{"fromCard":"4daffe9fc3ca","fromItem":"c9c9a1564517","toCard":"b4d14dd94e4b","toItem":"c6dbb8d4d857"},{"fromCard":"4daffe9fc3ca","fromItem":"14c87ef7a865","toCard":"b4d14dd94e4b","toItem":"02a77599e64d"},{"fromCard":"4daffe9fc3ca","fromItem":"9839dcb5086c","toCard":"b4d14dd94e4b","toItem":"90421ba86083"},{"fromCard":"4daffe9fc3ca","fromItem":"5bdea266d7eb","toCard":"b4d14dd94e4b","toItem":"665c32542346"},{"fromCard":"4daffe9fc3ca","fromItem":"80b9e3bb6032","toCard":"b4d14dd94e4b","toItem":"dc46c18950f4"},{"fromCard":"4daffe9fc3ca","fromItem":"5630fe7c7f36","toCard":"b4d14dd94e4b","toItem":"e8618ae41d46"},{"fromCard":"4daffe9fc3ca","fromItem":"6c79bd493d46","toCard":"b4d14dd94e4b","toItem":"93c4ff503a6c"},{"fromCard":"3cc3877780b7","fromItem":"6daf3bdf4463","toCard":"804a2f94a8a5","toItem":"6f4c5af02cce"},{"fromCard":"3cc3877780b7","fromItem":"da721edc135b","toCard":"804a2f94a8a5","toItem":"582f622559d7"},{"fromCard":"3cc3877780b7","fromItem":"12c80f3c262c","toCard":"804a2f94a8a5","toItem":"e87fc67b03f9"},{"fromCard":"3cc3877780b7","fromItem":"96311a5fe9c6","toCard":"804a2f94a8a5","toItem":"f2178b5f306f"},{"fromCard":"3cc3877780b7","fromItem":"a05e319e3a40","toCard":"804a2f94a8a5","toItem":"7941da52a463"},{"fromCard":"3cc3877780b7","fromItem":"2805bb9fb934","toCard":"804a2f94a8a5","toItem":"b24a311a24e7"},{"fromCard":"3cc3877780b7","fromItem":"27b24fae5e98","toCard":"804a2f94a8a5","toItem":"bef636445210"},{"fromCard":"3cc3877780b7","fromItem":"851c7e2203f6","toCard":"804a2f94a8a5","toItem":"454e0e0e2f49"},{"fromCard":"79bfd591b418","fromItem":"d0a88ef430af","toCard":"36a9b22deb09","toItem":"229b6b059505"},{"fromCard":"79bfd591b418","fromItem":"3b1cb3d6bf5c","toCard":"36a9b22deb09","toItem":"22e7d2849ede"},{"fromCard":"79bfd591b418","fromItem":"a2233bc9f55e","toCard":"36a9b22deb09","toItem":"99a205511452"},{"fromCard":"79bfd591b418","fromItem":"c7c4d2784a30","toCard":"36a9b22deb09","toItem":"7b40539fb90b"},{"fromCard":"79bfd591b418","fromItem":"0afcbc45a01a","toCard":"36a9b22deb09","toItem":"59a1504d1c9a"},{"fromCard":"79bfd591b418","fromItem":"a520e6b64369","toCard":"36a9b22deb09","toItem":"710673a08f25"},{"fromCard":"79bfd591b418","fromItem":"525e12dec93f","toCard":"36a9b22deb09","toItem":"b8fa28a4fba7"},{"fromCard":"40e8d4bb1e10","fromItem":"78ce1aa61f16","toCard":"9083088079f1","toItem":"a7a94c9a5980"},{"fromCard":"40e8d4bb1e10","fromItem":"3fd1a057f080","toCard":"9083088079f1","toItem":"513d15d3d0b4"},{"fromCard":"40e8d4bb1e10","fromItem":"0d8060d2814c","toCard":"9083088079f1","toItem":"7dc7b6db289e"},{"fromCard":"40e8d4bb1e10","fromItem":"eecd4368af36","toCard":"9083088079f1","toItem":"3297f194ef13"},{"fromCard":"40e8d4bb1e10","fromItem":"4586372be106","toCard":"9083088079f1","toItem":"980ca84f90e9"},{"fromCard":"40e8d4bb1e10","fromItem":"a33c197d5469","toCard":"9083088079f1","toItem":"59ad41a81afa"},{"fromCard":"40e8d4bb1e10","fromItem":"80d3dfd5ffd1","toCard":"9083088079f1","toItem":"4fe8311e48cc"},{"fromCard":"40e8d4bb1e10","fromItem":"be266b2a4632","toCard":"9083088079f1","toItem":"0a555adb1b5e"},{"fromCard":"40e8d4bb1e10","fromItem":"abdebdd19cc3","toCard":"9083088079f1","toItem":"07d0321953ac"},{"fromCard":"40e8d4bb1e10","fromItem":"ab67b03b8025","toCard":"9083088079f1","toItem":"7c37181a757a"},{"fromCard":"7132213dc4d6","fromItem":"c9a4d32a4b06","toCard":"960229f3f6e0","toItem":"02aa0b823044"},{"fromCard":"7132213dc4d6","fromItem":"9e0938fffe5a","toCard":"960229f3f6e0","toItem":"51d8ecf85d26"},{"fromCard":"7132213dc4d6","fromItem":"171a6258b2d7","toCard":"960229f3f6e0","toItem":"3c44885413f2"},{"fromCard":"7132213dc4d6","fromItem":"9555955f651e","toCard":"960229f3f6e0","toItem":"dc1fd0c87665"},{"fromCard":"7132213dc4d6","fromItem":"86e233332ad1","toCard":"960229f3f6e0","toItem":"fd6c1d29e407"},{"fromCard":"7132213dc4d6","fromItem":"a66bf4bb46ff","toCard":"960229f3f6e0","toItem":"e93cb96909bf"},{"fromCard":"7132213dc4d6","fromItem":"e8d9740ed82a","toCard":"960229f3f6e0","toItem":"997f7471b55a"},{"fromCard":"be4e4d09d31a","fromItem":"1a22971fa3cd","toCard":"22230cf607b2","toItem":"b23fe78769d6"},{"fromCard":"be4e4d09d31a","fromItem":"5f6273f482fc","toCard":"22230cf607b2","toItem":"d4531ea0886e"},{"fromCard":"be4e4d09d31a","fromItem":"8f82d14867ce","toCard":"22230cf607b2","toItem":"46596df7c17e"},{"fromCard":"be4e4d09d31a","fromItem":"abf134f39a89","toCard":"22230cf607b2","toItem":"5491634c295a"},{"fromCard":"be4e4d09d31a","fromItem":"75aa704a211b","toCard":"22230cf607b2","toItem":"459f4d3c55ff"},{"fromCard":"be4e4d09d31a","fromItem":"7a932ba15147","toCard":"22230cf607b2","toItem":"318a37ba954e"},{"fromCard":"be4e4d09d31a","fromItem":"12ad380de45b","toCard":"22230cf607b2","toItem":"ee62b34d8482"},{"fromCard":"be4e4d09d31a","fromItem":"8e6e422f7ac0","toCard":"22230cf607b2","toItem":"1b3fe08e644d"},{"fromCard":"be4e4d09d31a","fromItem":"004ff7c9eae2","toCard":"22230cf607b2","toItem":"60b687461983"},{"fromCard":"604cb5c75ee6","fromItem":"3f4c96a82c85","toCard":"4daffe9fc3ca","toItem":"7ab3b762db07"},{"fromCard":"604cb5c75ee6","fromItem":"e5fe358b4f37","toCard":"4daffe9fc3ca","toItem":"3dba7d0e42c6"},{"fromCard":"604cb5c75ee6","fromItem":"26264aafe2c0","toCard":"4daffe9fc3ca","toItem":"d66ae9d5d199"},{"fromCard":"604cb5c75ee6","fromItem":"25acaf756a15","toCard":"4daffe9fc3ca","toItem":"14c87ef7a865"},{"fromCard":"604cb5c75ee6","fromItem":"8260214802fa","toCard":"4daffe9fc3ca","toItem":"9839dcb5086c"},{"fromCard":"604cb5c75ee6","fromItem":"5a979e3cc770","toCard":"4daffe9fc3ca","toItem":"5bdea266d7eb"},{"fromCard":"70430ba47154","fromItem":"0064ce3269ff","toCard":"3cc3877780b7","toItem":"6daf3bdf4463"},{"fromCard":"70430ba47154","fromItem":"d37ae7280962","toCard":"3cc3877780b7","toItem":"da721edc135b"},{"fromCard":"70430ba47154","fromItem":"c3698ba7d598","toCard":"3cc3877780b7","toItem":"12c80f3c262c"},{"fromCard":"70430ba47154","fromItem":"089cc6a0ef6d","toCard":"3cc3877780b7","toItem":"96311a5fe9c6"},{"fromCard":"70430ba47154","fromItem":"ca703d3a7950","toCard":"3cc3877780b7","toItem":"a05e319e3a40"},{"fromCard":"70430ba47154","fromItem":"45cd8de6dfb4","toCard":"3cc3877780b7","toItem":"2805bb9fb934"},{"fromCard":"70430ba47154","fromItem":"48fabb6d05dc","toCard":"3cc3877780b7","toItem":"27b24fae5e98"},{"fromCard":"d2dbc4847108","fromItem":"b94c0378f398","toCard":"40e8d4bb1e10","toItem":"eecd4368af36"},{"fromCard":"d2dbc4847108","fromItem":"ed748653badb","toCard":"40e8d4bb1e10","toItem":"ab67b03b8025"},{"fromCard":"d2dbc4847108","fromItem":"ed77ce6bbb86","toCard":"40e8d4bb1e10","toItem":"abdebdd19cc3"},{"fromCard":"ede1e19d6b81","fromItem":"fef698aa3e3a","toCard":"7132213dc4d6","toItem":"c9a4d32a4b06"},{"fromCard":"ede1e19d6b81","fromItem":"84039656ae28","toCard":"7132213dc4d6","toItem":"918165996001"},{"fromCard":"ede1e19d6b81","fromItem":"2b042f531643","toCard":"7132213dc4d6","toItem":"9555955f651e"},{"fromCard":"ede1e19d6b81","fromItem":"a2e464c8f636","toCard":"7132213dc4d6","toItem":"86e233332ad1"},{"fromCard":"ede1e19d6b81","fromItem":"fef698aa3e3a","toCard":"40e8d4bb1e10","toItem":"3fd1a057f080"},{"fromCard":"5f25014dcb6f","fromItem":"557d23318b0e","toCard":"be4e4d09d31a","toItem":"1a22971fa3cd"},{"fromCard":"5f25014dcb6f","fromItem":"98d75d1466e3","toCard":"be4e4d09d31a","toItem":"5f6273f482fc"},{"fromCard":"5f25014dcb6f","fromItem":"d2ee878f3e4e","toCard":"be4e4d09d31a","toItem":"8f82d14867ce"},{"fromCard":"5f25014dcb6f","fromItem":"8d118f9303a2","toCard":"be4e4d09d31a","toItem":"75aa704a211b"},{"fromCard":"5f25014dcb6f","fromItem":"ee46b9c28030","toCard":"be4e4d09d31a","toItem":"8a34172cd9b9"},{"fromCard":"5f25014dcb6f","fromItem":"557d23318b0e","toCard":"40e8d4bb1e10","toItem":"0d8060d2814c"},{"fromCard":"5f25014dcb6f","fromItem":"557d23318b0e","toCard":"70430ba47154","toItem":"c3698ba7d598"},{"fromCard":"d2a490d48bef","fromItem":"fcf56559964d","toCard":"604cb5c75ee6","toItem":"25acaf756a15"},{"fromCard":"d2a490d48bef","fromItem":"1cb5ea1b2972","toCard":"604cb5c75ee6","toItem":"26264aafe2c0"},{"fromCard":"741b4043be2a","fromItem":"827d43a42c0d","toCard":"741b4043be2a","toItem":"492f6ff3c5bd"},{"fromCard":"741b4043be2a","fromItem":"492f6ff3c5bd","toCard":"d2dbc4847108","toItem":"b94c0378f398"},{"fromCard":"741b4043be2a","fromItem":"61dae96c1dc1","toCard":"741b4043be2a","toItem":"d74ee13f49e9"},{"fromCard":"741b4043be2a","fromItem":"d74ee13f49e9","toCard":"d2dbc4847108","toItem":"ed748653badb"},{"fromCard":"741b4043be2a","fromItem":"f2d27bacacc6","toCard":"741b4043be2a","toItem":"da1ea2e2c030"},{"fromCard":"741b4043be2a","fromItem":"da1ea2e2c030","toCard":"d2dbc4847108","toItem":"ed77ce6bbb86"},{"fromCard":"741b4043be2a","fromItem":"5aaceddc5dfa","toCard":"741b4043be2a","toItem":"673f00e14ac8"},{"fromCard":"741b4043be2a","fromItem":"673f00e14ac8","toCard":"d2dbc4847108","toItem":"920a9d877a33"},{"fromCard":"741b4043be2a","fromItem":"7c715d6164e4","toCard":"741b4043be2a","toItem":"9593901e23a4"},{"fromCard":"741b4043be2a","fromItem":"9593901e23a4","toCard":"d2dbc4847108","toItem":"4892ccd9a5af"},{"fromCard":"741b4043be2a","fromItem":"df1390c0dd36","toCard":"741b4043be2a","toItem":"6bcba2151ae8"},{"fromCard":"741b4043be2a","fromItem":"6bcba2151ae8","toCard":"d2dbc4847108","toItem":"f4c7aa4b0c7b"},{"fromCard":"741b4043be2a","fromItem":"71d223945672","toCard":"741b4043be2a","toItem":"1fbe73ba064b"},{"fromCard":"741b4043be2a","fromItem":"1fbe73ba064b","toCard":"d2dbc4847108","toItem":"56e2e76b1206"},{"fromCard":"741b4043be2a","fromItem":"15dbe77751a4","toCard":"741b4043be2a","toItem":"000c13a97d02"},{"fromCard":"741b4043be2a","fromItem":"000c13a97d02","toCard":"d2dbc4847108","toItem":"8df4f5d975ea"},{"fromCard":"bc4a7d53e65b","fromItem":"14ab91a93ecd","toCard":"a3d1d0eda344","toItem":"95ecd524e005"},{"fromCard":"a3d1d0eda344","fromItem":"95ecd524e005","toCard":"ede1e19d6b81","toItem":"fef698aa3e3a"},{"fromCard":"bc4a7d53e65b","fromItem":"115874103d54","toCard":"a3d1d0eda344","toItem":"53622c58a65f"},{"fromCard":"a3d1d0eda344","fromItem":"53622c58a65f","toCard":"ede1e19d6b81","toItem":"84039656ae28"},{"fromCard":"bc4a7d53e65b","fromItem":"7bc4fb0fbb07","toCard":"a3d1d0eda344","toItem":"2dee142d7520"},{"fromCard":"a3d1d0eda344","fromItem":"2dee142d7520","toCard":"ede1e19d6b81","toItem":"2b042f531643"},{"fromCard":"bc4a7d53e65b","fromItem":"1dbf6df29a57","toCard":"a3d1d0eda344","toItem":"811fa16dd67a"},{"fromCard":"a3d1d0eda344","fromItem":"811fa16dd67a","toCard":"ede1e19d6b81","toItem":"a2e464c8f636"},{"fromCard":"bc4a7d53e65b","fromItem":"70e6ca0b7f46","toCard":"a3d1d0eda344","toItem":"58042e6a376a"},{"fromCard":"a3d1d0eda344","fromItem":"58042e6a376a","toCard":"ede1e19d6b81","toItem":"8417503f2ec1"},{"fromCard":"bc4a7d53e65b","fromItem":"75421bf3a6d7","toCard":"a3d1d0eda344","toItem":"cb7297c60187"},{"fromCard":"a3d1d0eda344","fromItem":"cb7297c60187","toCard":"ede1e19d6b81","toItem":"a99894e6dcd6"},{"fromCard":"bc4a7d53e65b","fromItem":"3c815a1a0171","toCard":"a3d1d0eda344","toItem":"2466c005a53a"},{"fromCard":"a3d1d0eda344","fromItem":"2466c005a53a","toCard":"ede1e19d6b81","toItem":"ca14dcbb43c3"},{"fromCard":"bc4a7d53e65b","fromItem":"1e1358c0eafa","toCard":"a3d1d0eda344","toItem":"c2c247c75464"},{"fromCard":"a3d1d0eda344","fromItem":"c2c247c75464","toCard":"ede1e19d6b81","toItem":"42edc42febb3"},{"fromCard":"bc4a7d53e65b","fromItem":"1da55dafd5e2","toCard":"a3d1d0eda344","toItem":"cccb14ac5f8d"},{"fromCard":"a3d1d0eda344","fromItem":"cccb14ac5f8d","toCard":"ede1e19d6b81","toItem":"ae0596561bf7"},{"fromCard":"ddf7443aada6","fromItem":"254708beff01","toCard":"ddf7443aada6","toItem":"621d9fb696ff"},{"fromCard":"ddf7443aada6","fromItem":"621d9fb696ff","toCard":"5f25014dcb6f","toItem":"557d23318b0e"},{"fromCard":"ddf7443aada6","fromItem":"8eebe607f2e7","toCard":"ddf7443aada6","toItem":"a55e14dd68a4"},{"fromCard":"ddf7443aada6","fromItem":"a55e14dd68a4","toCard":"5f25014dcb6f","toItem":"98d75d1466e3"},{"fromCard":"ddf7443aada6","fromItem":"bdcae398ccd6","toCard":"ddf7443aada6","toItem":"7081bff7fbbf"},{"fromCard":"ddf7443aada6","fromItem":"7081bff7fbbf","toCard":"5f25014dcb6f","toItem":"d2ee878f3e4e"},{"fromCard":"ddf7443aada6","fromItem":"04cc768fc354","toCard":"ddf7443aada6","toItem":"c0857f4dd14b"},{"fromCard":"ddf7443aada6","fromItem":"c0857f4dd14b","toCard":"5f25014dcb6f","toItem":"8d118f9303a2"},{"fromCard":"ddf7443aada6","fromItem":"a4e3c3e81595","toCard":"ddf7443aada6","toItem":"e177760ed21c"},{"fromCard":"ddf7443aada6","fromItem":"e177760ed21c","toCard":"5f25014dcb6f","toItem":"e223f8a2ae4f"},{"fromCard":"ddf7443aada6","fromItem":"c7cbcdc3a3c7","toCard":"ddf7443aada6","toItem":"ff867649a7ab"},{"fromCard":"ddf7443aada6","fromItem":"ff867649a7ab","toCard":"5f25014dcb6f","toItem":"c75419645cd7"},{"fromCard":"ddf7443aada6","fromItem":"ab83f2e9d48c","toCard":"ddf7443aada6","toItem":"77ce54b0f3a8"},{"fromCard":"ddf7443aada6","fromItem":"77ce54b0f3a8","toCard":"5f25014dcb6f","toItem":"61f7136e61dd"},{"fromCard":"ddf7443aada6","fromItem":"9e2980a5c07f","toCard":"ddf7443aada6","toItem":"1a5c8dc52682"},{"fromCard":"ddf7443aada6","fromItem":"1a5c8dc52682","toCard":"5f25014dcb6f","toItem":"ee46b9c28030"},{"fromCard":"77d845698f06","fromItem":"bd15f257fa2f","toCard":"15440a67eab1","toItem":"0fbaee9d5463"},{"fromCard":"15440a67eab1","fromItem":"0fbaee9d5463","toCard":"d2a490d48bef","toItem":"fcf56559964d"},{"fromCard":"77d845698f06","fromItem":"70a65ec7bbd2","toCard":"15440a67eab1","toItem":"7f917fba182a"},{"fromCard":"15440a67eab1","fromItem":"7f917fba182a","toCard":"d2a490d48bef","toItem":"1cb5ea1b2972"},{"fromCard":"77d845698f06","fromItem":"615493d23a3d","toCard":"15440a67eab1","toItem":"5e89d862445f"},{"fromCard":"15440a67eab1","fromItem":"5e89d862445f","toCard":"d2a490d48bef","toItem":"3efb00af238f"},{"fromCard":"77d845698f06","fromItem":"795b4fa80ec3","toCard":"15440a67eab1","toItem":"e5dc83c9342f"},{"fromCard":"15440a67eab1","fromItem":"e5dc83c9342f","toCard":"d2a490d48bef","toItem":"4a8595b04429"},{"fromCard":"77d845698f06","fromItem":"1de6d7492163","toCard":"15440a67eab1","toItem":"49bc3c49c35a"},{"fromCard":"15440a67eab1","fromItem":"49bc3c49c35a","toCard":"d2a490d48bef","toItem":"137c94126360"},{"fromCard":"77d845698f06","fromItem":"24f7db6c86d1","toCard":"15440a67eab1","toItem":"b8913990f761"},{"fromCard":"15440a67eab1","fromItem":"b8913990f761","toCard":"d2a490d48bef","toItem":"7ec145ae1df0"},{"fromCard":"e2ed25a754c5","fromItem":"64052338fb1f","toCard":"3f23905e1bd1","toItem":"f4e6ebdbfeb1"},{"fromCard":"e2ed25a754c5","fromItem":"3d2bcfa7e7dc","toCard":"3f23905e1bd1","toItem":"0ab731ee6a4d"},{"fromCard":"e2ed25a754c5","fromItem":"00795470e77a","toCard":"3f23905e1bd1","toItem":"050aab0f3f07"},{"fromCard":"e2ed25a754c5","fromItem":"de139671b947","toCard":"3f23905e1bd1","toItem":"4d682d955c76"},{"fromCard":"e2ed25a754c5","fromItem":"2b7ccf6de5fd","toCard":"3f23905e1bd1","toItem":"a7d07f0909c2"},{"fromCard":"e2ed25a754c5","fromItem":"0f61220b836a","toCard":"3f23905e1bd1","toItem":"189521715d5c"},{"fromCard":"e2ed25a754c5","fromItem":"3b4d4a9e5dc8","toCard":"3f23905e1bd1","toItem":"205b45114604"},{"fromCard":"e2ed25a754c5","fromItem":"d550dafb58d7","toCard":"3f23905e1bd1","toItem":"f36bb9cb366b"},{"fromCard":"e2ed25a754c5","fromItem":"7ff7a116e2d6","toCard":"3f23905e1bd1","toItem":"981d8d113a26"},{"fromCard":"e2ed25a754c5","fromItem":"c99126a6a657","toCard":"3f23905e1bd1","toItem":"d716faa26538"},{"fromCard":"741b4043be2a","fromItem":"53ace9bcb154","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"53ace9bcb154","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"53ace9bcb154","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"741b4043be2a","fromItem":"a50183bda945","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"a50183bda945","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"a50183bda945","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"741b4043be2a","fromItem":"5c5d240090ff","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"5c5d240090ff","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"5c5d240090ff","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"741b4043be2a","fromItem":"d9bd5470e6f4","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"d9bd5470e6f4","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"d9bd5470e6f4","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"741b4043be2a","fromItem":"a704e3eb4207","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"a704e3eb4207","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"a704e3eb4207","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"741b4043be2a","fromItem":"da3aa0881532","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"da3aa0881532","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"da3aa0881532","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"741b4043be2a","fromItem":"c7db452dc632","toCard":"741b4043be2a","toItem":"827d43a42c0d"},{"fromCard":"741b4043be2a","fromItem":"c7db452dc632","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"741b4043be2a","fromItem":"c7db452dc632","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"bc4a7d53e65b","fromItem":"ed91968caff0","toCard":"bc4a7d53e65b","toItem":"14ab91a93ecd"},{"fromCard":"bc4a7d53e65b","fromItem":"ed91968caff0","toCard":"bc4a7d53e65b","toItem":"115874103d54"},{"fromCard":"bc4a7d53e65b","fromItem":"ed91968caff0","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"bc4a7d53e65b","fromItem":"efd2d426c201","toCard":"bc4a7d53e65b","toItem":"14ab91a93ecd"},{"fromCard":"bc4a7d53e65b","fromItem":"efd2d426c201","toCard":"bc4a7d53e65b","toItem":"115874103d54"},{"fromCard":"bc4a7d53e65b","fromItem":"efd2d426c201","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"bc4a7d53e65b","fromItem":"b81da2e28931","toCard":"bc4a7d53e65b","toItem":"14ab91a93ecd"},{"fromCard":"bc4a7d53e65b","fromItem":"b81da2e28931","toCard":"bc4a7d53e65b","toItem":"115874103d54"},{"fromCard":"bc4a7d53e65b","fromItem":"b81da2e28931","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"bc4a7d53e65b","fromItem":"0ff940f6c7de","toCard":"bc4a7d53e65b","toItem":"14ab91a93ecd"},{"fromCard":"bc4a7d53e65b","fromItem":"0ff940f6c7de","toCard":"bc4a7d53e65b","toItem":"115874103d54"},{"fromCard":"bc4a7d53e65b","fromItem":"0ff940f6c7de","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"bc4a7d53e65b","fromItem":"b757c6453134","toCard":"bc4a7d53e65b","toItem":"14ab91a93ecd"},{"fromCard":"bc4a7d53e65b","fromItem":"b757c6453134","toCard":"bc4a7d53e65b","toItem":"115874103d54"},{"fromCard":"bc4a7d53e65b","fromItem":"b757c6453134","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"bc4a7d53e65b","fromItem":"86b1c7d3973e","toCard":"bc4a7d53e65b","toItem":"14ab91a93ecd"},{"fromCard":"bc4a7d53e65b","fromItem":"86b1c7d3973e","toCard":"bc4a7d53e65b","toItem":"115874103d54"},{"fromCard":"bc4a7d53e65b","fromItem":"86b1c7d3973e","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"ddf7443aada6","fromItem":"fa14aaf7f7b3","toCard":"ddf7443aada6","toItem":"254708beff01"},{"fromCard":"ddf7443aada6","fromItem":"fa14aaf7f7b3","toCard":"ddf7443aada6","toItem":"8eebe607f2e7"},{"fromCard":"ddf7443aada6","fromItem":"fa14aaf7f7b3","toCard":"ddf7443aada6","toItem":"bdcae398ccd6"},{"fromCard":"ddf7443aada6","fromItem":"7e4e66dcedbf","toCard":"ddf7443aada6","toItem":"254708beff01"},{"fromCard":"ddf7443aada6","fromItem":"7e4e66dcedbf","toCard":"ddf7443aada6","toItem":"8eebe607f2e7"},{"fromCard":"ddf7443aada6","fromItem":"7e4e66dcedbf","toCard":"ddf7443aada6","toItem":"bdcae398ccd6"},{"fromCard":"ddf7443aada6","fromItem":"7b5af9980666","toCard":"ddf7443aada6","toItem":"254708beff01"},{"fromCard":"ddf7443aada6","fromItem":"7b5af9980666","toCard":"ddf7443aada6","toItem":"8eebe607f2e7"},{"fromCard":"ddf7443aada6","fromItem":"7b5af9980666","toCard":"ddf7443aada6","toItem":"bdcae398ccd6"},{"fromCard":"ddf7443aada6","fromItem":"3e0fa16fb9d8","toCard":"ddf7443aada6","toItem":"254708beff01"},{"fromCard":"ddf7443aada6","fromItem":"3e0fa16fb9d8","toCard":"ddf7443aada6","toItem":"8eebe607f2e7"},{"fromCard":"ddf7443aada6","fromItem":"3e0fa16fb9d8","toCard":"ddf7443aada6","toItem":"bdcae398ccd6"},{"fromCard":"ddf7443aada6","fromItem":"d46a520f29ff","toCard":"ddf7443aada6","toItem":"254708beff01"},{"fromCard":"ddf7443aada6","fromItem":"d46a520f29ff","toCard":"ddf7443aada6","toItem":"8eebe607f2e7"},{"fromCard":"ddf7443aada6","fromItem":"d46a520f29ff","toCard":"ddf7443aada6","toItem":"bdcae398ccd6"},{"fromCard":"77d845698f06","fromItem":"574870c0df38","toCard":"77d845698f06","toItem":"bd15f257fa2f"},{"fromCard":"77d845698f06","fromItem":"574870c0df38","toCard":"77d845698f06","toItem":"70a65ec7bbd2"},{"fromCard":"77d845698f06","fromItem":"574870c0df38","toCard":"77d845698f06","toItem":"615493d23a3d"},{"fromCard":"77d845698f06","fromItem":"2fb3bacd0851","toCard":"77d845698f06","toItem":"bd15f257fa2f"},{"fromCard":"77d845698f06","fromItem":"2fb3bacd0851","toCard":"77d845698f06","toItem":"70a65ec7bbd2"},{"fromCard":"77d845698f06","fromItem":"2fb3bacd0851","toCard":"77d845698f06","toItem":"615493d23a3d"},{"fromCard":"77d845698f06","fromItem":"c71e44b703bc","toCard":"77d845698f06","toItem":"bd15f257fa2f"},{"fromCard":"77d845698f06","fromItem":"c71e44b703bc","toCard":"77d845698f06","toItem":"70a65ec7bbd2"},{"fromCard":"77d845698f06","fromItem":"c71e44b703bc","toCard":"77d845698f06","toItem":"615493d23a3d"},{"fromCard":"77d845698f06","fromItem":"90b45b4494a2","toCard":"77d845698f06","toItem":"bd15f257fa2f"},{"fromCard":"77d845698f06","fromItem":"90b45b4494a2","toCard":"77d845698f06","toItem":"70a65ec7bbd2"},{"fromCard":"77d845698f06","fromItem":"90b45b4494a2","toCard":"77d845698f06","toItem":"615493d23a3d"},{"fromCard":"77d845698f06","fromItem":"6fa9b1c6a224","toCard":"77d845698f06","toItem":"bd15f257fa2f"},{"fromCard":"77d845698f06","fromItem":"6fa9b1c6a224","toCard":"77d845698f06","toItem":"70a65ec7bbd2"},{"fromCard":"77d845698f06","fromItem":"6fa9b1c6a224","toCard":"77d845698f06","toItem":"615493d23a3d"},{"fromCard":"721dd788c29e","fromItem":"3f6554998e66","toCard":"721dd788c29e","toItem":"dd5f4c944878"},{"fromCard":"721dd788c29e","fromItem":"3f6554998e66","toCard":"721dd788c29e","toItem":"24dd21f71c1f"},{"fromCard":"721dd788c29e","fromItem":"3f6554998e66","toCard":"721dd788c29e","toItem":"5b3df9a4f6c1"},{"fromCard":"721dd788c29e","fromItem":"ae6621f2bc61","toCard":"721dd788c29e","toItem":"dd5f4c944878"},{"fromCard":"721dd788c29e","fromItem":"ae6621f2bc61","toCard":"721dd788c29e","toItem":"24dd21f71c1f"},{"fromCard":"721dd788c29e","fromItem":"ae6621f2bc61","toCard":"721dd788c29e","toItem":"5b3df9a4f6c1"},{"fromCard":"721dd788c29e","fromItem":"a8f81a85a59e","toCard":"721dd788c29e","toItem":"dd5f4c944878"},{"fromCard":"721dd788c29e","fromItem":"a8f81a85a59e","toCard":"721dd788c29e","toItem":"24dd21f71c1f"},{"fromCard":"721dd788c29e","fromItem":"a8f81a85a59e","toCard":"721dd788c29e","toItem":"5b3df9a4f6c1"},{"fromCard":"721dd788c29e","fromItem":"60367cd91b8c","toCard":"721dd788c29e","toItem":"dd5f4c944878"},{"fromCard":"721dd788c29e","fromItem":"60367cd91b8c","toCard":"721dd788c29e","toItem":"24dd21f71c1f"},{"fromCard":"721dd788c29e","fromItem":"60367cd91b8c","toCard":"721dd788c29e","toItem":"5b3df9a4f6c1"},{"fromCard":"c2194ce0b939","fromItem":"94ed0d671aa2","toCard":"741b4043be2a","toItem":"53ace9bcb154"},{"fromCard":"c2194ce0b939","fromItem":"a86315977993","toCard":"741b4043be2a","toItem":"a50183bda945"},{"fromCard":"c2194ce0b939","fromItem":"91b53f243937","toCard":"741b4043be2a","toItem":"5c5d240090ff"},{"fromCard":"c2194ce0b939","fromItem":"c02e391d1199","toCard":"741b4043be2a","toItem":"da3aa0881532"},{"fromCard":"c2194ce0b939","fromItem":"ea17cd920a90","toCard":"741b4043be2a","toItem":"a704e3eb4207"},{"fromCard":"c2194ce0b939","fromItem":"ba93b2a4916f","toCard":"bc4a7d53e65b","toItem":"ed91968caff0"},{"fromCard":"c2194ce0b939","fromItem":"4c8c8f4c7c78","toCard":"bc4a7d53e65b","toItem":"b81da2e28931"},{"fromCard":"c2194ce0b939","fromItem":"596a04d6ea25","toCard":"bc4a7d53e65b","toItem":"0ff940f6c7de"},{"fromCard":"c2194ce0b939","fromItem":"da7dd0f379d6","toCard":"721dd788c29e","toItem":"3f6554998e66"},{"fromCard":"c2194ce0b939","fromItem":"9bccb86ed02b","toCard":"721dd788c29e","toItem":"ae6621f2bc61"},{"fromCard":"c2194ce0b939","fromItem":"b511373dc965","toCard":"e2ed25a754c5","toItem":"64052338fb1f"},{"fromCard":"c2194ce0b939","fromItem":"ece711393602","toCard":"e2ed25a754c5","toItem":"de139671b947"},{"fromCard":"c2194ce0b939","fromItem":"f8c08a3eddb9","toCard":"e2ed25a754c5","toItem":"c99126a6a657"},{"fromCard":"54c43c884ed2","fromItem":"e47fb8c6d388","toCard":"741b4043be2a","toItem":"53ace9bcb154"},{"fromCard":"54c43c884ed2","fromItem":"08620c4a481a","toCard":"741b4043be2a","toItem":"df1390c0dd36"},{"fromCard":"54c43c884ed2","fromItem":"d7a89058ea91","toCard":"741b4043be2a","toItem":"61dae96c1dc1"},{"fromCard":"54c43c884ed2","fromItem":"b8a6341a7251","toCard":"741b4043be2a","toItem":"f2d27bacacc6"},{"fromCard":"54c43c884ed2","fromItem":"5f42d2f9db73","toCard":"741b4043be2a","toItem":"c7db452dc632"},{"fromCard":"54c43c884ed2","fromItem":"bb8c72d8ebd2","toCard":"741b4043be2a","toItem":"d9bd5470e6f4"},{"fromCard":"54c43c884ed2","fromItem":"627ff0703539","toCard":"ddf7443aada6","toItem":"fa14aaf7f7b3"},{"fromCard":"54c43c884ed2","fromItem":"7a98e2d8e7c1","toCard":"ddf7443aada6","toItem":"bdcae398ccd6"},{"fromCard":"54c43c884ed2","fromItem":"8e0cbf9ccff7","toCard":"ddf7443aada6","toItem":"04cc768fc354"},{"fromCard":"54c43c884ed2","fromItem":"909060a1dda7","toCard":"ddf7443aada6","toItem":"d46a520f29ff"},{"fromCard":"54c43c884ed2","fromItem":"1387012c2cb6","toCard":"e2ed25a754c5","toItem":"64052338fb1f"},{"fromCard":"54c43c884ed2","fromItem":"360cb8ae224e","toCard":"e2ed25a754c5","toItem":"00795470e77a"},{"fromCard":"54c43c884ed2","fromItem":"806be0d97956","toCard":"e2ed25a754c5","toItem":"3d2bcfa7e7dc"},{"fromCard":"94771d1c0220","fromItem":"c12cd05671cf","toCard":"bc4a7d53e65b","toItem":"7bc4fb0fbb07"},{"fromCard":"94771d1c0220","fromItem":"d94ffc8e925f","toCard":"bc4a7d53e65b","toItem":"1dbf6df29a57"},{"fromCard":"94771d1c0220","fromItem":"8b6d8a02a7ce","toCard":"bc4a7d53e65b","toItem":"3c815a1a0171"},{"fromCard":"94771d1c0220","fromItem":"5f3dedd1834e","toCard":"bc4a7d53e65b","toItem":"1da55dafd5e2"},{"fromCard":"94771d1c0220","fromItem":"97e000c73796","toCard":"bc4a7d53e65b","toItem":"ed91968caff0"},{"fromCard":"94771d1c0220","fromItem":"fb32996900ac","toCard":"bc4a7d53e65b","toItem":"efd2d426c201"},{"fromCard":"94771d1c0220","fromItem":"c711d5ba4140","toCard":"bc4a7d53e65b","toItem":"b81da2e28931"},{"fromCard":"94771d1c0220","fromItem":"537901206c5e","toCard":"bc4a7d53e65b","toItem":"b757c6453134"},{"fromCard":"94771d1c0220","fromItem":"71570329a4d3","toCard":"bc4a7d53e65b","toItem":"86b1c7d3973e"},{"fromCard":"94771d1c0220","fromItem":"80284ba00392","toCard":"741b4043be2a","toItem":"7c715d6164e4"},{"fromCard":"94771d1c0220","fromItem":"53b379ead30a","toCard":"741b4043be2a","toItem":"5c5d240090ff"},{"fromCard":"94771d1c0220","fromItem":"fc296ac8501e","toCard":"e2ed25a754c5","toItem":"64052338fb1f"},{"fromCard":"94771d1c0220","fromItem":"3d88670c32af","toCard":"e2ed25a754c5","toItem":"2b7ccf6de5fd"},{"fromCard":"2d9543e1d732","fromItem":"4c071587a9f7","toCard":"77d845698f06","toItem":"70a65ec7bbd2"},{"fromCard":"2d9543e1d732","fromItem":"cb1e3e4345d3","toCard":"77d845698f06","toItem":"615493d23a3d"},{"fromCard":"2d9543e1d732","fromItem":"5cc34286248e","toCard":"77d845698f06","toItem":"795b4fa80ec3"},{"fromCard":"2d9543e1d732","fromItem":"b6f3210984d9","toCard":"77d845698f06","toItem":"574870c0df38"},{"fromCard":"2d9543e1d732","fromItem":"7232543f0317","toCard":"77d845698f06","toItem":"2fb3bacd0851"},{"fromCard":"2d9543e1d732","fromItem":"2338b2baa3ff","toCard":"77d845698f06","toItem":"90b45b4494a2"},{"fromCard":"2d9543e1d732","fromItem":"1b3bd0eb9afa","toCard":"77d845698f06","toItem":"c71e44b703bc"},{"fromCard":"2d9543e1d732","fromItem":"531a1276e331","toCard":"77d845698f06","toItem":"6fa9b1c6a224"},{"fromCard":"2d9543e1d732","fromItem":"513a161464e5","toCard":"721dd788c29e","toItem":"ae6621f2bc61"},{"fromCard":"2d9543e1d732","fromItem":"ac948c0194f8","toCard":"e2ed25a754c5","toItem":"64052338fb1f"},{"fromCard":"2d9543e1d732","fromItem":"1b8677208d28","toCard":"e2ed25a754c5","toItem":"0f61220b836a"}],"reportVisuals":{"Executive Dashboard":[{"id":"v1","type":"card","label":"Total Revenue","x":0,"y":0,"w":25,"h":15,"fields":["Order Metrics.Total Revenue"]},{"id":"v2","type":"card","label":"Order Count","x":25,"y":0,"w":25,"h":15,"fields":["Order Metrics.Order Count"]},{"id":"v3","type":"card","label":"Active Customers","x":50,"y":0,"w":25,"h":15,"fields":["Customer 360.Active Customers"]},{"id":"v4","type":"card","label":"Churn Rate","x":75,"y":0,"w":25,"h":15,"fields":["Customer 360.Churn Rate"]},{"id":"v5","type":"bar","label":"Revenue by Month","x":0,"y":18,"w":50,"h":40,"fields":["Order Metrics.Total Revenue","Date.Month"]},{"id":"v6","type":"line","label":"YoY Growth Trend","x":50,"y":18,"w":50,"h":40,"fields":["Order Metrics.Revenue YoY Growth","Date.FiscalQuarter"]},{"id":"v7","type":"bar","label":"AOV vs Target","x":0,"y":62,"w":35,"h":35,"fields":["Order Metrics.Average Order Value","KPI Targets.Revenue Target"]},{"id":"v8","type":"table","label":"KPI Summary","x":35,"y":62,"w":65,"h":35,"fields":["Order Metrics.Net Revenue","Customer 360.Avg Lifetime Value","KPI Targets.On-Time Target","Date.Date"]}],"Sales Performance":[{"id":"v1","type":"slicer","label":"Year","x":0,"y":0,"w":20,"h":10,"fields":["Date.Year"]},{"id":"v2","type":"slicer","label":"Quarter","x":20,"y":0,"w":20,"h":10,"fields":["Date.Quarter"]},{"id":"v3","type":"slicer","label":"Region","x":40,"y":0,"w":20,"h":10,"fields":["Order Metrics.region"]},{"id":"v4","type":"bar","label":"Revenue by Channel","x":0,"y":13,"w":50,"h":42,"fields":["Order Metrics.Total Revenue","Order Metrics.channel"]},{"id":"v5","type":"bar","label":"Top Sellers","x":50,"y":13,"w":50,"h":42,"fields":["Product Performance.Top Seller Revenue","Product Performance.category"]},{"id":"v6","type":"scatter","label":"AOV vs Discount","x":0,"y":58,"w":40,"h":40,"fields":["Order Metrics.avg_order_value","Order Metrics.Discount %"]},{"id":"v7","type":"pie","label":"Return Rate","x":40,"y":58,"w":30,"h":40,"fields":["Order Metrics.Return Rate","Product Performance.brand"]},{"id":"v8","type":"card","label":"Rev / SKU","x":70,"y":58,"w":30,"h":40,"fields":["Product Performance.Revenue per SKU","Date.Date"]}],"Customer Insights":[{"id":"v1","type":"card","label":"Active Customers","x":0,"y":0,"w":33,"h":14,"fields":["Customer 360.Active Customers"]},{"id":"v2","type":"card","label":"New MTD","x":33,"y":0,"w":34,"h":14,"fields":["Customer 360.New Customers MTD"]},{"id":"v3","type":"card","label":"Churn Rate","x":67,"y":0,"w":33,"h":14,"fields":["Customer 360.Churn Rate"]},{"id":"v4","type":"map","label":"Customers by Country","x":0,"y":17,"w":55,"h":45,"fields":["Customer 360.country","Customer 360.Active Customers","Order Metrics.total_revenue"]},{"id":"v5","type":"bar","label":"Revenue by Tier","x":55,"y":17,"w":45,"h":45,"fields":["Customer 360.tier","Order Metrics.Order Count"]},{"id":"v6","type":"scatter","label":"Churn Risk Matrix","x":0,"y":65,"w":50,"h":33,"fields":["Customer 360.churn_risk_score","Customer 360.total_orders","Customer 360.High Risk Count"]},{"id":"v7","type":"line","label":"Retention Trend","x":50,"y":65,"w":50,"h":33,"fields":["Customer 360.Customer Retention Rate","Date.Date","Date.MonthName"]}],"Fulfillment Tracker":[{"id":"v1","type":"card","label":"On-Time %","x":0,"y":0,"w":25,"h":14,"fields":["Fulfillment.On-Time Delivery %"]},{"id":"v2","type":"card","label":"Avg Transit Days","x":25,"y":0,"w":25,"h":14,"fields":["Fulfillment.Avg Transit Days"]},{"id":"v3","type":"card","label":"Shipped MTD","x":50,"y":0,"w":25,"h":14,"fields":["Fulfillment.Orders Shipped MTD"]},{"id":"v4","type":"card","label":"Shipping Cost","x":75,"y":0,"w":25,"h":14,"fields":["Fulfillment.Shipping Cost Total"]},{"id":"v5","type":"bar","label":"By Carrier","x":0,"y":17,"w":50,"h":40,"fields":["Fulfillment.carrier","Fulfillment.orders_shipped","Fulfillment.avg_transit_days"]},{"id":"v6","type":"line","label":"Delivery Trend","x":50,"y":17,"w":50,"h":40,"fields":["Fulfillment.On-Time Delivery %","Fulfillment.Late Deliveries","Date.Week"]},{"id":"v7","type":"table","label":"Weekly Detail","x":0,"y":60,"w":100,"h":38,"fields":["Date.Date","Fulfillment.carrier","Fulfillment.orders_shipped","KPI Targets.On-Time Target"]}]}};
+</script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+(function(){
+  const NODE_W = 220;
+  const HEADER_H = 58;
+  const ITEM_H = 24;
+  const MAX_CARD_ITEMS = 15;
+  const GROUP_PAD = 20;
+  const GROUP_LABEL_H = 28;
+
+  const LAYER_CONF = {
+    postgresql:  { icon: 'dns',            colorHex: '#336791', light: 'var(--postgresql-light)', dark: 'var(--postgresql-dark)' },
+    snowflake:   { icon: 'ac_unit',        colorHex: '#29b5e8', light: 'var(--snowflake-light)',  dark: 'var(--snowflake-dark)' },
+    databricks:  { icon: 'storage',        colorHex: '#e09030', light: 'var(--databricks-light)', dark: 'var(--databricks-dark)' },
+    powerquery:  { icon: 'sync_alt',       colorHex: '#20c9a6', light: 'var(--powerquery-light)', dark: 'var(--powerquery-dark)' },
+    semantic:    { icon: 'account_tree',   colorHex: '#4a8ae0', light: 'var(--semantic-light)',   dark: 'var(--semantic-dark)' },
+    report:      { icon: 'insert_chart',   colorHex: '#a070d0', light: 'var(--report-light)',     dark: 'var(--report-dark)' },
+  };
+  const MEDALLION_COLORS = {
+    bronze: { hex: '#d09040', light: 'var(--bronze-light)' },
+    silver: { hex: '#909aa0', light: 'var(--silver-light)' },
+    gold:   { hex: '#e0b830', light: 'var(--gold-light)' },
+  };
+
+  /* ── VISUAL TYPE ICONS ── */
+  const VIS_ICONS = {
+    card: 'pin', bar: 'bar_chart', line: 'show_chart', pie: 'pie_chart',
+    table: 'table_chart', scatter: 'scatter_plot', map: 'map',
+    slicer: 'filter_list', gauge: 'speed', treemap: 'grid_view',
+  };
+
+  /* ── STATE ── */
+  let data;
+  const cardMap = new Map();
+  const expandedCards = new Set();
+  const fullyExpandedCards = new Set();
+  let selectedItemId = null;
+  let selectedCardId = null;
+  let searchTerm = '';
+  let highlightUnused = true;
+  let hideUnused = false;
+  const usedOnReport = new Set();
+  let currentTransform = d3.zoomIdentity;
+
+  let hlItems = new Set();
+  let hlItemsUpstream = new Set();
+  let hlItemsDownstream = new Set();
+  let hlCards = new Set();
+  let hlCardEdges = new Set();
+  let hlItemEdges = new Set();
+
+  const itemToCard = new Map();
+  const itemAdjOut = new Map();
+  const itemAdjIn  = new Map();
+  const cardAdjOut = new Map();
+  const cardAdjIn  = new Map();
+
+  const nodePos = new Map();
+  const groups = [];
+  const lanes = [];
+
+  /* ── INIT ── */
+  function boot() {
+    const w = setInterval(() => {
+      if (typeof d3 !== 'undefined' && window.LINEAGE_DATA) { clearInterval(w); init(); }
+    }, 50);
+  }
+
+  function init() {
+    data = window.LINEAGE_DATA;
+
+    data.cards.forEach(c => {
+      c.items.forEach(it => {
+        const dot = it.name.lastIndexOf('.');
+        it.short = dot >= 0 ? it.name.slice(dot + 1) : it.name;
+      });
+      c.items.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'column' ? -1 : 1;
+        return a.short.localeCompare(b.short);
+      });
+      if (c.layer === 'databricks') {
+        const schema = (c.name.split('.')[1] || '').toLowerCase();
+        if (schema.includes('bronze') || schema.includes('raw')) c._med = 'bronze';
+        else if (schema.includes('silver')) c._med = 'silver';
+        else c._med = 'gold';
+      }
+      if (c.layer === 'databricks') {
+        const ld = c.name.lastIndexOf('.');
+        c._display = ld >= 0 ? c.name.slice(ld + 1) : c.name;
+        c._sub = c.name.split('.').slice(0, 2).join('.');
+      } else if (c.layer === 'postgresql' || c.layer === 'snowflake') {
+        const parts = c.name.split('.');
+        c._display = parts[parts.length - 1];
+        c._sub = parts.slice(0, Math.max(1, parts.length - 1)).join('.');
+      } else {
+        c._display = c.name;
+        c._sub = c.type.replace(/_/g, ' ');
+      }
+      cardMap.set(c.id, c);
+    });
+
+    data.cards.forEach(c => c.items.forEach(it => itemToCard.set(it.id, c.id)));
+    data.itemEdges.forEach((e, i) => {
+      if (!itemAdjOut.has(e.fromItem)) itemAdjOut.set(e.fromItem, []);
+      itemAdjOut.get(e.fromItem).push({ ...e, idx: i });
+      if (!itemAdjIn.has(e.toItem)) itemAdjIn.set(e.toItem, []);
+      itemAdjIn.get(e.toItem).push({ ...e, idx: i });
+    });
+    data.cardEdges.forEach((e, i) => {
+      if (!cardAdjOut.has(e.from)) cardAdjOut.set(e.from, []);
+      cardAdjOut.get(e.from).push({ to: e.to, idx: i });
+      if (!cardAdjIn.has(e.to)) cardAdjIn.set(e.to, []);
+      cardAdjIn.get(e.to).push({ from: e.from, idx: i });
+    });
+
+    const reportSeeds = [];
+    data.cards.forEach(c => {
+      if (c.layer !== 'report') return;
+      c.items.forEach(rpItem => {
+        usedOnReport.add(rpItem.id);
+        (itemAdjOut.get(rpItem.id) || []).forEach(e => reportSeeds.push(e.toItem));
+      });
+    });
+    const vuRpt = new Set();
+    const quRpt = [...reportSeeds];
+    while (quRpt.length) {
+      const c = quRpt.shift(); if (vuRpt.has(c)) continue; vuRpt.add(c);
+      usedOnReport.add(c);
+      (itemAdjOut.get(c) || []).forEach(e => quRpt.push(e.toItem));
+    }
+
+    // Default: expand all cards
+    data.cards.forEach(c => { if (c.items.length > 0) expandedCards.add(c.id); });
+
+    document.getElementById('info').textContent =
+      data.cards.length + ' entities \u00b7 ' + data.cardEdges.length + ' links \u00b7 ' + data.itemEdges.length + ' column deps';
+
+    computeLayout();
+    render();
+    setupEvents();
+  }
+
+  /* ── NODE HEIGHT ── */
+  function nodeHeight(c) {
+    if (!expandedCards.has(c.id) || c.items.length === 0) return HEADER_H;
+    const vis = getVisibleItems(c);
+    const shown = Math.min(vis.length, MAX_CARD_ITEMS);
+    const toggle = (vis.length < c.items.length) ? ITEM_H : 0;
+    return HEADER_H + shown * ITEM_H + toggle + 12;
+  }
+
+  function getVisibleItems(card) {
+    if (!expandedCards.has(card.id) || card.items.length === 0) return [];
+    if (selectedItemId && hlCards.has(card.id)) {
+      const filtered = card.items.filter(it => hlItems.has(it.id));
+      if (filtered.length > 0) return filtered;
+    }
+    if (selectedCardId && hlCards.has(card.id) && card.id !== selectedCardId) {
+      const selCard = cardMap.get(selectedCardId);
+      if (selCard && selCard.layer === 'report' && hlItems.size > 0) {
+        const filtered = card.items.filter(it => hlItems.has(it.id));
+        if (filtered.length > 0) return filtered;
+      }
+    }
+    if (hideUnused && card.layer !== 'report') {
+      const filtered = card.items.filter(it => usedOnReport.has(it.id));
+      if (filtered.length > 0) return filtered;
+      return [];
+    }
+    return card.items;
+  }
+
+  /* ── LAYOUT ── */
+  const LANE_GAP      = 160;
+  const SUB_LANE_GAP  = 60;
+  const LANE_PAD      = 24;
+  const CARD_GAP      = 14;
+  const MEDALLION_ORDER = ['bronze', 'silver', 'gold'];
+
+  const LANE_ORDER = ['postgresql', 'snowflake', 'databricks', 'powerquery', 'semantic', 'report'];
+  const LANE_LABELS = {
+    postgresql: 'PostgreSQL', snowflake: 'Snowflake',
+    databricks: 'Databricks', powerquery: 'Power Query',
+    semantic: 'Semantic Model', report: 'Report Pages',
+  };
+  const LANE_BG = {
+    postgresql: { color: '#336791', bg: 'rgba(51,103,145,0.06)' },
+    snowflake:  { color: '#29b5e8', bg: 'rgba(41,181,232,0.05)' },
+    databricks: { color: '#e09030', bg: 'rgba(224,144,48,0.04)' },
+    powerquery: { color: '#20c9a6', bg: 'rgba(32,201,166,0.06)' },
+    semantic:   { color: '#4a8ae0', bg: 'rgba(74,138,224,0.06)' },
+    report:     { color: '#a070d0', bg: 'rgba(160,112,208,0.06)' },
+  };
+
+  function computeLayout() {
+    nodePos.clear(); groups.length = 0; lanes.length = 0;
+
+    const byLayer = {};
+    LANE_ORDER.forEach(l => byLayer[l] = []);
+    data.cards.forEach(c => { if (byLayer[c.layer]) byLayer[c.layer].push(c); });
+    Object.values(byLayer).forEach(arr => arr.sort((a, b) => (a.y || 0) - (b.y || 0) || a.name.localeCompare(b.name)));
+
+    let cx = LANE_PAD;
+    const laneX = {};
+    const laneMaxY = {};
+
+    // ── Sources: PG + Snowflake stacked vertically in one column ──
+    const hasPG = byLayer.postgresql.length > 0;
+    const hasSF = byLayer.snowflake.length > 0;
+    const hasSources = hasPG || hasSF;
+
+    if (hasSources) {
+      const srcX = cx;
+      laneX.sources = srcX;
+      let y = 55 + GROUP_LABEL_H + 8;  // room for "Sources" lane title
+
+      // PostgreSQL sub-group
+      const pgStartY = y;
+      if (hasPG) {
+        y += GROUP_LABEL_H;  // sub-group label
+        byLayer.postgresql.forEach(c => {
+          const h = nodeHeight(c);
+          nodePos.set(c.id, { x: srcX, y, w: NODE_W, h });
+          y += h + CARD_GAP;
+        });
+      }
+      const pgEndY = y;
+
+      // Small gap between sub-groups
+      if (hasPG && hasSF) y += 12;
+
+      // Snowflake sub-group
+      const sfStartY = y;
+      if (hasSF) {
+        y += GROUP_LABEL_H;
+        byLayer.snowflake.forEach(c => {
+          const h = nodeHeight(c);
+          nodePos.set(c.id, { x: srcX, y, w: NODE_W, h });
+          y += h + CARD_GAP;
+        });
+      }
+      const sfEndY = y;
+
+      laneMaxY.sources = y;
+      cx += NODE_W + LANE_PAD * 2 + LANE_GAP;
+
+      // Source sub-groups for rendering
+      if (hasPG) {
+        groups.push({
+          id: 'group-src-pg', label: 'PostgreSQL',
+          x: srcX - 8, y: pgStartY,
+          w: NODE_W + 16, h: pgEndY - pgStartY + 4,
+          tier: '_pg',
+        });
+      }
+      if (hasSF) {
+        groups.push({
+          id: 'group-src-sf', label: 'Snowflake',
+          x: srcX - 8, y: sfStartY,
+          w: NODE_W + 16, h: sfEndY - sfStartY + 4,
+          tier: '_sf',
+        });
+      }
+    }
+
+    // ── Databricks: split into 3 sub-columns (Bronze | Silver | Gold) ──
+    const dbCards = byLayer.databricks;
+    const byMed = { bronze: [], silver: [], gold: [] };
+    dbCards.forEach(c => byMed[c._med || 'gold'].push(c));
+    const activeTiers = MEDALLION_ORDER.filter(t => byMed[t].length > 0);
+
+    const dbStartX = cx;
+    const dbTierX = {};
+    activeTiers.forEach((tier, i) => {
+      dbTierX[tier] = cx;
+      cx += NODE_W + (i < activeTiers.length - 1 ? SUB_LANE_GAP : 0);
+    });
+    const dbEndX = cx;
+    cx += LANE_PAD + LANE_GAP;
+
+    const tierMaxY = {};
+    for (const tier of activeTiers) {
+      const cards = byMed[tier];
+      let y = 55 + GROUP_LABEL_H + 8;
+      cards.forEach(c => {
+        const h = nodeHeight(c);
+        nodePos.set(c.id, { x: dbTierX[tier], y, w: NODE_W, h });
+        y += h + CARD_GAP;
+      });
+      tierMaxY[tier] = y;
+    }
+    laneMaxY.databricks = Math.max(...Object.values(tierMaxY), 200);
+
+    // ── Remaining single-column lanes ──
+    const otherLanes = ['powerquery', 'semantic', 'report'];
+    otherLanes.forEach(layer => {
+      laneX[layer] = cx;
+      let y = 55;
+      byLayer[layer].forEach(c => {
+        const h = nodeHeight(c);
+        nodePos.set(c.id, { x: cx, y, w: NODE_W, h });
+        y += h + CARD_GAP;
+      });
+      laneMaxY[layer] = y;
+      cx += NODE_W + LANE_PAD * 2 + LANE_GAP;
+    });
+
+    // ── Lane backgrounds (each fits its own content) ──
+    const LANE_BOTTOM_PAD = 30;
+
+    if (hasSources) {
+      const srcH = (laneMaxY.sources || 200) + LANE_BOTTOM_PAD;
+      lanes.push({
+        layer: 'sources',
+        x: laneX.sources - LANE_PAD, y: 0,
+        w: NODE_W + LANE_PAD * 2, h: srcH,
+        color: '#4a7a9a', bgColor: 'rgba(60,100,140,0.05)',
+        label: 'Source Systems',
+      });
+    }
+
+    if (dbCards.length > 0) {
+      const dbH = (laneMaxY.databricks || 200) + LANE_BOTTOM_PAD;
+      const dbW = dbEndX - dbStartX + LANE_PAD * 2;
+      lanes.push({
+        layer: 'databricks',
+        x: dbStartX - LANE_PAD, y: 0, w: dbW, h: dbH,
+        color: LANE_BG.databricks.color, bgColor: LANE_BG.databricks.bg,
+        label: LANE_LABELS.databricks,
+      });
+      for (const tier of activeTiers) {
+        const mc = MEDALLION_COLORS[tier] || {};
+        groups.push({
+          id: 'group-db-' + tier,
+          label: tier.charAt(0).toUpperCase() + tier.slice(1),
+          x: dbTierX[tier] - 8, y: 50,
+          w: NODE_W + 16, h: (tierMaxY[tier] || 100) - 50 + 4, tier,
+        });
+      }
+    }
+
+    otherLanes.forEach(layer => {
+      if (byLayer[layer].length === 0) return;
+      const lb = LANE_BG[layer];
+      const lh = (laneMaxY[layer] || 200) + LANE_BOTTOM_PAD;
+      lanes.push({
+        layer, x: laneX[layer] - LANE_PAD, y: 0,
+        w: NODE_W + LANE_PAD * 2, h: lh,
+        color: lb.color, bgColor: lb.bg, label: LANE_LABELS[layer],
+      });
+    });
+  }
+
+  /* ── HIGHLIGHTS ── */
+  function computeHighlightsNoLayout() {
+    hlItems.clear(); hlItemsUpstream.clear(); hlItemsDownstream.clear();
+    hlCards.clear(); hlCardEdges.clear(); hlItemEdges.clear();
+    if (!selectedItemId && !selectedCardId) return;
+
+    if (selectedItemId) {
+      hlItems.add(selectedItemId);
+      const vu = new Set(); const qu = [selectedItemId];
+      while (qu.length) { const c = qu.shift(); if (vu.has(c)) continue; vu.add(c);
+        if (c !== selectedItemId) { hlItems.add(c); hlItemsUpstream.add(c); }
+        (itemAdjOut.get(c) || []).forEach(e => { hlItemEdges.add(e.idx); qu.push(e.toItem); });
+      }
+      const vd = new Set(); const qd = [selectedItemId];
+      while (qd.length) { const c = qd.shift(); if (vd.has(c)) continue; vd.add(c);
+        if (c !== selectedItemId) { hlItems.add(c); hlItemsDownstream.add(c); }
+        (itemAdjIn.get(c) || []).forEach(e => { hlItemEdges.add(e.idx); qd.push(e.fromItem); });
+      }
+      hlItems.forEach(iid => { const cid = itemToCard.get(iid); if (cid) hlCards.add(cid); });
+      data.cardEdges.forEach((e, idx) => {
+        if (hlCards.has(e.from) && hlCards.has(e.to)) hlCardEdges.add(idx);
+      });
+    } else if (selectedCardId) {
+      hlCards.add(selectedCardId);
+      const vu2 = new Set(); const qu2 = [selectedCardId];
+      while (qu2.length) { const c = qu2.shift(); if (vu2.has(c)) continue; vu2.add(c); hlCards.add(c);
+        (cardAdjOut.get(c) || []).forEach(e => { hlCardEdges.add(e.idx); qu2.push(e.to); });
+      }
+      const vd2 = new Set(); const qd2 = [selectedCardId];
+      while (qd2.length) { const c = qd2.shift(); if (vd2.has(c)) continue; vd2.add(c); hlCards.add(c);
+        (cardAdjIn.get(c) || []).forEach(e => { hlCardEdges.add(e.idx); qd2.push(e.from); });
+      }
+      const selCard = cardMap.get(selectedCardId);
+      if (selCard && selCard.items && selCard.items.length > 0) {
+        const seedsUp = [], seedsDown = [];
+        selCard.items.forEach(item => {
+          hlItems.add(item.id);
+          (itemAdjOut.get(item.id) || []).forEach(e => { hlItemEdges.add(e.idx); seedsUp.push(e.toItem); });
+          (itemAdjIn.get(item.id) || []).forEach(e => { hlItemEdges.add(e.idx); seedsDown.push(e.fromItem); });
+        });
+        const vu3 = new Set(); const qu3 = [...seedsUp];
+        while (qu3.length) { const c = qu3.shift(); if (vu3.has(c)) continue; vu3.add(c);
+          hlItems.add(c); hlItemsUpstream.add(c);
+          (itemAdjOut.get(c) || []).forEach(e => { hlItemEdges.add(e.idx); qu3.push(e.toItem); });
+        }
+        const vd3 = new Set(); const qd3 = [...seedsDown];
+        while (qd3.length) { const c = qd3.shift(); if (vd3.has(c)) continue; vd3.add(c);
+          hlItems.add(c); hlItemsDownstream.add(c);
+          (itemAdjIn.get(c) || []).forEach(e => { hlItemEdges.add(e.idx); qd3.push(e.fromItem); });
+        }
+        hlItems.forEach(iid => { const cid = itemToCard.get(iid); if (cid) hlCards.add(cid); });
+        hlCardEdges.clear();
+        data.cardEdges.forEach((e, idx) => {
+          if (hlCards.has(e.from) && hlCards.has(e.to)) hlCardEdges.add(idx);
+        });
+      }
+    }
+  }
+
+  function computeHighlights() {
+    computeHighlightsNoLayout();
+    if (selectedItemId || (selectedCardId && hlItems.size > 0)) {
+      let didExpand = false;
+      hlItems.forEach(iid => {
+        const cid = itemToCard.get(iid);
+        if (cid && !expandedCards.has(cid)) { expandedCards.add(cid); didExpand = true; }
+      });
+      if (didExpand) { groups.length = 0; lanes.length = 0; computeLayout(); }
+    }
+  }
+
+  /* ── RENDER ── */
+  function render() {
+    computeHighlights();
+    const hasSel = selectedItemId || selectedCardId;
+
+    const svg = document.getElementById('edge-layer');
+    svg.innerHTML = '';
+
+    const showItemEdges = selectedItemId || (selectedCardId && hlItemEdges.size > 0);
+    if (!showItemEdges) {
+      data.cardEdges.forEach((e, idx) => {
+        const sp = nodePos.get(e.to);
+        const tp = nodePos.get(e.from);
+        if (!sp || !tp) return;
+        const isHl = hlCardEdges.has(idx);
+        if (hasSel && !isHl) return;
+        const cls = hasSel ? 'hl' : '';
+        const x1 = sp.x + sp.w, y1 = sp.y + sp.h / 2;
+        const x2 = tp.x,        y2 = tp.y + tp.h / 2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'edge-card ' + cls);
+        path.setAttribute('d', bezier(x1, y1, x2, y2));
+        svg.appendChild(path);
+      });
+    }
+
+    if (showItemEdges) data.itemEdges.forEach((e, idx) => {
+      if (!hlItemEdges.has(idx)) return;
+      const srcCard = cardMap.get(e.toCard);
+      const tgtCard = cardMap.get(e.fromCard);
+      if (!srcCard || !tgtCard) return;
+      const sp = nodePos.get(srcCard.id);
+      const tp = nodePos.get(tgtCard.id);
+      if (!sp || !tp) return;
+      const srcExp = expandedCards.has(srcCard.id);
+      const tgtExp = expandedCards.has(tgtCard.id);
+      const srcVisible = getVisibleItems(srcCard);
+      const tgtVisible = getVisibleItems(tgtCard);
+      const srcIdx = srcVisible.findIndex(i => i.id === e.toItem);
+      const tgtIdx = tgtVisible.findIndex(i => i.id === e.fromItem);
+      const maxItemY1 = Math.min(srcIdx, MAX_CARD_ITEMS - 1);
+      const maxItemY2 = Math.min(tgtIdx, MAX_CARD_ITEMS - 1);
+      const y1 = srcExp && srcIdx >= 0 ? sp.y + HEADER_H + maxItemY1 * ITEM_H + ITEM_H / 2 : sp.y + sp.h / 2;
+      const y2 = tgtExp && tgtIdx >= 0 ? tp.y + HEADER_H + maxItemY2 * ITEM_H + ITEM_H / 2 : tp.y + tp.h / 2;
+      const x1 = sp.x + sp.w, x2 = tp.x;
+      let d;
+      if (sp.x === tp.x) {
+        const arc = sp.x + sp.w + 40;
+        d = 'M' + x1 + ',' + y1 + ' C' + arc + ',' + y1 + ' ' + arc + ',' + y2 + ' ' + x1 + ',' + y2;
+      } else {
+        d = bezier(x1, y1, x2, y2);
+      }
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'edge-item hl');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    });
+
+    const nl = document.getElementById('node-layer');
+    nl.innerHTML = '';
+
+    lanes.forEach(ln => {
+      const lane = document.createElement('div');
+      lane.className = 'lane-bg';
+      lane.style.cssText = 'left:' + ln.x + 'px; top:' + ln.y + 'px; width:' + ln.w + 'px; height:' + ln.h + 'px; background:' + ln.bgColor + ';';
+      const title = document.createElement('div');
+      title.className = 'lane-title';
+      title.style.color = ln.color;
+      title.textContent = ln.label;
+      lane.appendChild(title);
+      nl.appendChild(lane);
+    });
+
+    const SOURCE_GROUP_COLORS = { _pg: '#336791', _sf: '#29b5e8' };
+    groups.forEach(gr => {
+      const mc = MEDALLION_COLORS[gr.tier] || {};
+      const groupHex = SOURCE_GROUP_COLORS[gr.tier] || mc.hex || '#555';
+      const box = document.createElement('div');
+      box.className = 'group-box';
+      box.style.cssText = 'left:' + gr.x + 'px; top:' + gr.y + 'px; width:' + gr.w + 'px; height:' + gr.h + 'px; border-color:' + groupHex + ';';
+      const lbl = document.createElement('div');
+      lbl.className = 'group-label';
+      lbl.style.background = groupHex;
+      lbl.textContent = gr.label;
+      box.appendChild(lbl);
+      nl.appendChild(box);
+    });
+
+    data.cards.forEach(card => {
+      const pos = nodePos.get(card.id);
+      if (!pos) return;
+      const conf = LAYER_CONF[card.layer] || LAYER_CONF.semantic;
+      const isExp = expandedCards.has(card.id);
+      const cardNameMatch = searchTerm && card.name.toLowerCase().includes(searchTerm);
+      const itemMatch = searchTerm && card.items.some(it => it.name.toLowerCase().includes(searchTerm));
+      const isSearchHit = cardNameMatch || itemMatch;
+      const isDimmed = (hasSel && !hlCards.has(card.id)) || (searchTerm && !isSearchHit);
+      const isLineageHit = hasSel && hlCards.has(card.id);
+
+      let headerColor = conf.colorHex;
+      let headerLight = conf.light;
+      let headerDark = conf.dark;
+      if (card.layer === 'databricks' && MEDALLION_COLORS[card._med]) {
+        headerColor = MEDALLION_COLORS[card._med].hex;
+        headerLight = MEDALLION_COLORS[card._med].light;
+      }
+
+      const div = document.createElement('div');
+      div.className = 'sc-node' + (isExp ? ' expanded' : '') + (isDimmed ? ' dimmed' : '') + (isSearchHit ? ' search-hit' : '') + (isLineageHit ? ' lineage-hit' : '');
+      div.style.cssText = 'left:' + pos.x + 'px; top:' + pos.y + 'px; height:' + pos.h + 'px; border-color:' + headerColor + ';';
+      div.dataset.id = card.id;
+
+      const header = document.createElement('div');
+      header.className = 'sc-header';
+      header.style.background = headerColor;
+      header.style.cursor = 'pointer';
+      header.title = card.name + '\nClick: show lineage\nDbl-click: expand';
+
+      const icon = document.createElement('span');
+      icon.className = 'sc-icon';
+      icon.textContent = conf.icon;
+
+      const info = document.createElement('div');
+      info.className = 'sc-header-info';
+      info.style.background = headerLight;
+      const hl = document.createElement('div');
+      hl.className = 'sc-headline';
+      hl.style.color = headerDark || '#d0d0e0';
+      hl.textContent = card._display;
+      hl.title = card.name;
+      const sub = document.createElement('div');
+      sub.className = 'sc-subtitle';
+      sub.style.color = headerDark || '#8888aa';
+      sub.textContent = card._sub;
+      info.appendChild(hl);
+      info.appendChild(sub);
+
+      header.appendChild(icon);
+      header.appendChild(info);
+
+      if (card.items.length > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'sc-badge';
+        badge.style.cursor = 'pointer';
+        badge.textContent = (isExp ? '\u25BC' : '\u25B6') + ' ' + card.items.length;
+        badge.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (expandedCards.has(card.id)) expandedCards.delete(card.id);
+          else expandedCards.add(card.id);
+          relayout();
+        });
+        header.appendChild(badge);
+      }
+
+      header.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        selectedCardId = selectedCardId === card.id ? null : card.id;
+        selectedItemId = null;
+        render();
+        updateWireframe();
+      });
+
+      div.appendChild(header);
+
+      if (isExp && card.items.length > 0) {
+        const itemsDiv = document.createElement('div');
+        itemsDiv.className = 'sc-items';
+        const visible = getVisibleItems(card);
+        if (visible.length > MAX_CARD_ITEMS) {
+          itemsDiv.style.maxHeight = (MAX_CARD_ITEMS * ITEM_H) + 'px';
+        }
+        itemsDiv.addEventListener('wheel', (ev) => {
+          const el = itemsDiv;
+          const atTop = el.scrollTop === 0 && ev.deltaY < 0;
+          const atBot = el.scrollTop + el.clientHeight >= el.scrollHeight && ev.deltaY > 0;
+          if (!atTop && !atBot) ev.stopPropagation();
+        }, { passive: false });
+
+        visible.forEach(it => {
+          const row = document.createElement('div');
+          row.className = 'sc-item';
+          if (selectedItemId === it.id) row.classList.add('hl');
+          else if (hlItemsUpstream.has(it.id)) row.classList.add('connected-upstream');
+          else if (hlItemsDownstream.has(it.id)) row.classList.add('connected-downstream');
+          else if (hlItems.has(it.id)) row.classList.add('connected');
+          if (highlightUnused && card.layer !== 'report' && !usedOnReport.has(it.id)) {
+            row.classList.add('unused');
+          }
+          if (searchTerm && it.name.toLowerCase().includes(searchTerm)) row.classList.add('hl');
+          row.dataset.itemId = it.id;
+          row.title = it.name + ' (' + it.type + ')';
+
+          const nm = document.createElement('span');
+          nm.className = 'sc-item-name';
+          nm.textContent = it.short;
+          const tp = document.createElement('span');
+          tp.className = 'sc-item-type ' + (it.type === 'measure' ? 'measure' : 'col');
+          tp.textContent = it.type === 'measure' ? 'M' : 'col';
+          row.appendChild(nm);
+          row.appendChild(tp);
+
+          row.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            selectedItemId = selectedItemId === it.id ? null : it.id;
+            selectedCardId = null;
+            render();
+            updateWireframe();
+          });
+
+          itemsDiv.appendChild(row);
+        });
+
+        if (visible.length < card.items.length) {
+          const inf = document.createElement('div');
+          inf.className = 'sc-toggle';
+          inf.textContent = '\u2026 ' + (card.items.length - visible.length) + ' more hidden';
+          inf.style.opacity = '0.5';
+          inf.style.fontStyle = 'italic';
+          inf.style.cursor = 'default';
+          itemsDiv.appendChild(inf);
+        }
+
+        div.appendChild(itemsDiv);
+      }
+
+      nl.appendChild(div);
+    });
+
+    applyZoom();
+    updateLegendVisibility();
+  }
+
+  function relayout() {
+    computeHighlightsNoLayout();
+    groups.length = 0; lanes.length = 0;
+    computeLayout();
+    render();
+  }
+
+  function bezier(x1, y1, x2, y2) {
+    const dx = Math.abs(x2 - x1);
+    const cp = Math.max(dx * 0.45, 50);
+    return 'M' + x1 + ',' + y1 + ' C' + (x1 + cp) + ',' + y1 + ' ' + (x2 - cp) + ',' + y2 + ' ' + x2 + ',' + y2;
+  }
+
+  /* ── ZOOM / PAN ── */
+  let zoomBehavior;
+
+  function setupZoom() {
+    const canvas = d3.select('#canvas');
+    zoomBehavior = d3.zoom()
+      .scaleExtent([0.02, 5])
+      .touchable(() => true)
+      .on('zoom', ev => {
+        currentTransform = ev.transform;
+        applyZoom();
+        updateLegendVisibility();
+      });
+    canvas.call(zoomBehavior);
+    canvas.on('click', () => {
+      selectedItemId = null;
+      selectedCardId = null;
+      render();
+      updateWireframe();
+    });
+  }
+
+  function applyZoom() {
+    const vp = document.getElementById('viewport');
+    vp.style.transform = 'translate(' + currentTransform.x + 'px,' + currentTransform.y + 'px) scale(' + currentTransform.k + ')';
+  }
+
+  function fitView() {
+    if (!zoomBehavior || nodePos.size === 0) return;
+    const canvas = document.getElementById('canvas');
+    const cW = canvas.clientWidth || 800;
+    const cH = canvas.clientHeight || 600;
+    if (cW < 10 || cH < 10) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodePos.forEach(p => {
+      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + p.w); maxY = Math.max(maxY, p.y + p.h);
+    });
+    groups.forEach(gr => {
+      minX = Math.min(minX, gr.x); minY = Math.min(minY, gr.y);
+      maxX = Math.max(maxX, gr.x + gr.w); maxY = Math.max(maxY, gr.y + gr.h);
+    });
+    lanes.forEach(ln => {
+      minX = Math.min(minX, ln.x); minY = Math.min(minY, ln.y);
+      maxX = Math.max(maxX, ln.x + ln.w); maxY = Math.max(maxY, ln.y + ln.h);
+    });
+    const PAD = 20;
+    const bw = maxX - minX + PAD * 2;
+    const bh = maxY - minY + PAD * 2;
+    // Account for wireframe panel if open
+    const wfPanel = document.getElementById('wireframe-panel');
+    const panelW = wfPanel && wfPanel.classList.contains('open') ? wfPanel.offsetWidth : 0;
+    const availW = cW - panelW;
+    const scale = Math.min(availW / bw, cH / bh, 1.5);
+    const tx = (availW - bw * scale) / 2 - minX * scale + PAD * scale;
+    const ty = (cH - bh * scale) / 2 - minY * scale + PAD * scale;
+    currentTransform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+    d3.select('#canvas').call(zoomBehavior.transform, currentTransform);
+  }
+
+  /* ── SMART LEGEND ── */
+  function updateLegendVisibility() {
+    const legend = document.getElementById('legend');
+    if (!legend) return;
+    const canvas = document.getElementById('canvas');
+    const cW = canvas.clientWidth || 800;
+    const cH = canvas.clientHeight || 600;
+
+    // Hide legend when viewport is small or zoom is very tight (scale > 0.7)
+    const tooSmall = cW < 500 || cH < 400;
+    const tooZoomed = currentTransform.k > 0.75;
+    const wfOpen = document.getElementById('wireframe-panel').classList.contains('open');
+
+    if (tooSmall || tooZoomed || wfOpen) {
+      legend.classList.add('hidden');
+    } else {
+      legend.classList.remove('hidden');
+    }
+  }
+
+  /* ── WIREFRAME PANEL ── */
+  function updateWireframe() {
+    const panel = document.getElementById('wireframe-panel');
+    const canvas = document.getElementById('wfCanvas');
+    const titleEl = document.getElementById('wfTitle');
+    const subtitleEl = document.getElementById('wfSubtitle');
+
+    // Determine what to show
+    let reportPage = null;
+    let impactedFields = new Set();
+
+    if (selectedCardId) {
+      const card = cardMap.get(selectedCardId);
+      if (card && card.layer === 'report') {
+        reportPage = card;
+      }
+    }
+
+    if (selectedItemId) {
+      // Find which report pages use this item (downstream)
+      const allDownstream = new Set();
+      const vd = new Set(); const qd = [selectedItemId];
+      while (qd.length) {
+        const c = qd.shift(); if (vd.has(c)) continue; vd.add(c);
+        allDownstream.add(c);
+        (itemAdjIn.get(c) || []).forEach(e => { qd.push(e.fromItem); });
+      }
+
+      // Find report pages containing downstream items
+      data.cards.forEach(c => {
+        if (c.layer !== 'report') return;
+        const hasImpact = c.items.some(it => allDownstream.has(it.id));
+        if (hasImpact) {
+          if (!reportPage) reportPage = c;
+          c.items.forEach(it => {
+            if (allDownstream.has(it.id)) impactedFields.add(it.name);
+          });
+        }
+      });
+    } else if (reportPage) {
+      // When a report page card is selected, all its items are "impacted"
+      reportPage.items.forEach(it => impactedFields.add(it.name));
+    }
+
+    if (!reportPage || !data.reportVisuals || !data.reportVisuals[reportPage.name]) {
+      panel.classList.remove('open');
+      return;
+    }
+
+    const visuals = data.reportVisuals[reportPage.name];
+    panel.classList.add('open');
+    titleEl.textContent = reportPage.name;
+
+    // Count impacted visuals
+    let impactedCount = 0;
+    visuals.forEach(v => {
+      const hit = v.fields.some(f => impactedFields.has(f));
+      if (hit) impactedCount++;
+    });
+
+    if (selectedItemId) {
+      subtitleEl.textContent = impactedCount + ' of ' + visuals.length + ' visuals impacted';
+    } else {
+      subtitleEl.textContent = visuals.length + ' visuals on this page';
+    }
+
+    canvas.innerHTML = '';
+    const cRect = canvas.getBoundingClientRect();
+    const cW = cRect.width || 300;
+    const cH = cRect.height || 400;
+
+    visuals.forEach(v => {
+      const isImpacted = v.fields.some(f => impactedFields.has(f));
+
+      const el = document.createElement('div');
+      el.className = 'wf-visual' + (isImpacted ? ' impacted' : '');
+      el.style.left   = (v.x / 100 * cW) + 'px';
+      el.style.top    = (v.y / 100 * cH) + 'px';
+      el.style.width  = (v.w / 100 * cW) + 'px';
+      el.style.height = (v.h / 100 * cH) + 'px';
+
+      const iconEl = document.createElement('span');
+      iconEl.className = 'wf-icon';
+      iconEl.textContent = VIS_ICONS[v.type] || 'widgets';
+      el.appendChild(iconEl);
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'wf-label';
+      labelEl.textContent = v.label;
+      el.appendChild(labelEl);
+
+      // Tooltip with fields
+      el.title = v.label + ' (' + v.type + ')\n' + v.fields.join('\n');
+
+      canvas.appendChild(el);
+    });
+
+    // Re-fit view to account for panel width
+    setTimeout(fitView, 50);
+  }
+
+  /* ── EVENTS ── */
+  function syncCanvasTop() {
+    const tb = document.getElementById('toolbar');
+    const cv = document.getElementById('canvas');
+    if (tb && cv) cv.style.top = tb.offsetHeight + 'px';
+  }
+
+  function setupEvents() {
+    setupZoom();
+    syncCanvasTop();
+    fitView();
+    setTimeout(fitView, 100);
+    setTimeout(fitView, 500);
+
+    const ro = new ResizeObserver(() => { syncCanvasTop(); fitView(); });
+    ro.observe(document.getElementById('canvas'));
+    ro.observe(document.getElementById('toolbar'));
+
+    document.getElementById('searchBox').addEventListener('input', e => {
+      searchTerm = e.target.value.toLowerCase().trim();
+      if (searchTerm) { selectedItemId = null; selectedCardId = null; }
+      relayout();
+    });
+    document.getElementById('btnClear').addEventListener('click', () => {
+      selectedItemId = null; selectedCardId = null;
+      render();
+      updateWireframe();
+    });
+    document.getElementById('btnExpandAll').addEventListener('click', () => {
+      data.cards.forEach(c => { if (c.items.length > 0) expandedCards.add(c.id); });
+      relayout();
+    });
+    document.getElementById('btnCollapseAll').addEventListener('click', () => {
+      expandedCards.clear(); fullyExpandedCards.clear();
+      selectedItemId = null; selectedCardId = null;
+      relayout();
+      updateWireframe();
+    });
+    document.getElementById('btnHlUnused').addEventListener('click', () => {
+      highlightUnused = !highlightUnused;
+      const btn = document.getElementById('btnHlUnused');
+      btn.textContent = 'Unused: ' + (highlightUnused ? 'on' : 'off');
+      btn.classList.toggle('active', highlightUnused);
+      render();
+    });
+    document.getElementById('btnFit').addEventListener('click', () => fitView());
+    document.getElementById('node-layer').addEventListener('click', e => e.stopPropagation());
+
+    // Wireframe panel close button
+    document.getElementById('wfClose').addEventListener('click', () => {
+      document.getElementById('wireframe-panel').classList.remove('open');
+      selectedCardId = null;
+      selectedItemId = null;
+      render();
+      setTimeout(fitView, 50);
+    });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
